@@ -66,7 +66,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
 本APP将有两个独立的用户界面：投票UI可以适用于移动设备，或者其他可以使用浏览器的东西。投票结果UI设计为投影在投影仪或者其他大屏幕上。它将
 实时显示正在投票的结果。
 ![vote_system](iamge/vote_system.png)
-![vote_system1](image/vote_system(1).png)
+![vote_system1](image/vote_system1.png)
 
 ### 体系结构
 
@@ -118,17 +118,17 @@ about the application state in isolation from the application's behavior).State�
 
 当第一次投票开始，此时应该有一些方式来区分哪个是当前被投票的。在这种情况下，应该有一个vote entry在state中，它保留着目前处于投票状态的
 物品对。物品对或许应该从entries集合中拿出来。
-！[vote_server_tree_pair](vote_server_tree_pair.png)
+！[vote_server_tree_pair](image/vote_server_tree_pair.png)
 
 在投票开始之后，票数也应该被存储起来。我们可以用vote中另外的数据结构来做这件事。
-![vote_server_tree_tally](vote_server_tree_tally.png)
+![vote_server_tree_tally](image/vote_server_tree_tally.png)
 
 当一次投票结束，失败的entry将会被舍弃，胜利的entry将会被放回entries，作为最后一个物品(item).它之后将会与其他物品进行PK。接下来的两个
 entry同样会被放在vote中。
-![vote_server_tree_next](vote_server_tree_next.png)
+![vote_server_tree_next](image/vote_server_tree_next.png)
 
 只要还有待投票的entries，我们可以想象出这种state循环。在某些时候，将只剩下一个entry。这时，我们就可以称它为胜者并结束投票:
-![vote_server_tree_winner](vote_server_tree_winner.png)
+![vote_server_tree_winner](image/vote_server_tree_winner.png)
 
 这看起来似乎是一种可行的设计。有很多不同的方法来设计这些要求的state，这可能不是最佳的。但是这并不重要。只需要在开始的时候足够好就行，
 重要的是我们已经建立了一种具体的应用程序该如何执行任务的想法。这是我们甚至没有考虑任何代码之前就完成的！
