@@ -21,7 +21,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
 * 服务端应用程序
   * 设计应用程序状态树(State Tree)
   * 项目安装
-  * 使用不可变数据的舒适
+  * 熟悉不可变数据
   * 使用纯函数编写逻辑层
     * 加载实体
     * 开始投票
@@ -66,6 +66,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
 本APP将有两个独立的用户界面：投票UI可以适用于移动设备，或者其他可以使用浏览器的东西。投票结果UI设计为投影在投影仪或者其他大屏幕上。它将
 实时显示正在投票的结果。
 ![vote_system](iamge/vote_system.png)
+
 ![vote_system1](image/vote_system1.png)
 
 ### 体系结构
@@ -132,3 +133,165 @@ entry同样会被放在vote中。
 
 这看起来似乎是一种可行的设计。有很多不同的方法来设计这些要求的state，这可能不是最佳的。但是这并不重要。只需要在开始的时候足够好就行，
 重要的是我们已经建立了一种具体的应用程序该如何执行任务的想法。这是我们甚至没有考虑任何代码之前就完成的！
+
+### 项目安装
+
+说了这么多废话，是时候开始干活了。在我们做任何事情之前，我们需要建立一个项目目录并且初始化它作为一个NPM项目：
+```
+mkdir voting-server
+cd voting-server
+npm init -y
+```
+输入命令后的结果是在voting-server目录下有一个文件package.json.
+
+我们打算使用ES6语法来编写程序。虽然node从4.0.0版本支持很多ES6特性，但是它仍然不支持模块化(modules),而模块化正是我们想用的。我们需要向
+项目中添加babel, 这样我们能够随心所欲的使用ES6特性，babel会将代码转换成ES5:
+```
+npm install --save-dev babel-core babel-cli babel-preset-es2015
+```
+因为我们将写一系列的单元测试，我们同样需要一些库来写它们：
+```
+npm install --save-dev  mocha chai
+```
+[Mocha](https://mochajs.org/)是我们将要使用的测试框架，[Chai](http://chaijs.com/)是一个断言(assertion)/期望(expectation)库，我
+们在测试中使用它来指定我们期望发生的事情。
+
+我们可以使用node_modules下的mocha命令来运行测试。
+```
+./node_modules/mocha/bin/mocha --compilers js: babel-core/register --recursive
+```
+这条命令告诉Mocha递归的寻找项目中的所有测试并且运行它们。在运行前它先使用babel转化ES6代码。
+
+从长远来看，在我们的package.json中存储这条命令将会更容易：
+```
+//package.json
+"script": {
+  "test": "Mocha --compilers js: babel-core/register --recursive"
+},
+```
+我们需要做的另外一件事是使babel的ES6/ES2015语法支持功能生效。这可以通过激活我们已经安装过的**babel-preset-es2015**包来完成。我们只需
+要在package.json中添加babel部分：
+
+```
+//package.json
+"babel": {
+  "preset": ["es2015"]
+},
+```
+现在我们可以使用npm命令来运行测试。
+
+```
+npm run test
+```
+**test:watch** 命令可以用来启动一个进程监控代码中的变化并且在每次变化后运行测试:
+```
+//package.json
+"script": {
+  "test": "mocha --compolers js:babel-core/register recursive",
+  "test:watch": "npm run test -- --watch"
+},
+```
+我们首先打算用的库是Facebook的immutable, 它可以为我们提供一些数据结构使用。我们将在下一个章节讨论immutable，现在我们仅仅将它加入到项
+目中来，同时安装的有chai-immutable库，它可以扩展Chai来支持比较Immutable数据结构(comparing Immutable data structures):
+```
+npm install --save immutable
+npm install --save-dev chai-immutable
+```
+我们需要在任何测试运行前插入chai-immutable.我们可以在一个很小的test_heler文件中做到这一点，所以我们接下来应该创建它：
+```
+// test/test_helper.js
+
+import chai from 'chai';
+import chaiImmutable from 'chai-immutable';
+
+chai.use(charImmutable);
+```
+接下来我们需要在Mocha启动测试之前导入test_helper文件：
+```
+//package.json
+
+"script": {
+  "test": "mocha --compilers js:babel-core/register --require ./test/test_helper.js --recursive"
+},
+```
+这就是我们在开始阶段所有需要安装的！！！
+
+### 熟悉不可变数据
+
+关于Redux架构的第二个重点是，state不仅仅是一颗树，实际上他是一个immutable tree.
+
+看上一节中的树，只通过更新树中的代码来更改应用程序的状态，这似乎是一个合理的想法：在maps中执行修改操作，在arrays中执行删除操作等等。然而
+这并不是Redux所做的事。
+
+一个Redux的状态树是一个immutable data structure. 这意味着一旦你有一颗state tree, 只要它还存在它将再也不会改变。它将永远保持相同的状
+态。接下来你该如何进入下一个state是通过生成另外一颗state tree来反映你想要作出的改变。
+
+这意味着应用程序的任意两个连续状态是存储在两个分开且独立的树中(separate and independent)。从一个状态跳到下一状态是通过执行一个函数，它
+会获取当前的状态并返回一个新的状态。
+
+！[此处缺图]()
+
+这为什么会是好想法呢？ 人们首先提到的是如果你拥有一棵树中所有的state,并且进行了一些非破坏性的更新，你可以不需要坐太多额外的工作来保存应用
+程序的历史： 仅需要保留以前state trees的集合。然后你可以执行 undo/redo 等“免费”操作——只需要将当前应用程序状态设置为历史记录中的上一个
+state tree或者下一个state tree. 你同样可以序列化历史记录并且将它发送到一些存储介质中保存，这样你可以在之后重播(replay)它,这在debugging
+的时候非常有用。
+
+然而，我想说除了这些功能之外，关于immutable data最重要的是它将如何简化你的代码。你可以使用纯函数(pure function)来编程:这些函数除了获
+取数据和返回数据外，不做任何其他操作。这些是可以信赖的、行为可预测的函数。你可以随意的调用它们，并且它们的行为不会改变。给它们相同的参数，
+它们就会返回相同的结果。它们不会改变世界的state(they`re not going to change the state of world. //懵逼脸，为什么突然冒出这句话)。
+测试将变得很随意，因为在你调用之前，不需要设置一些stub或者其他假的操作（other fakes to "prepare the universe"）.它仅仅是输入数据，
+输出数据。
+
+Immutable data structures是我们建立应用程序state需要用的材料。所以让我们花点时间来编写一些单元测试来说明它是如何工作的。
+
+---
+
+如果你已经熟悉了immutable data和immutable库，可以随意的跳过下一部分。
+
+---
+
+为了熟悉immutability的想法，我们先讨论可能是最简单的数据结构:如果有一个“计数器”应用程序，它的state仅仅是单个数字。state将会从0到1,2,...
+
+我们已经习惯了将数字考虑为immutable data.当“计数器”增加，我们不会变化这个数字。因为在数字上没有setter，让数字变化实际上是不可能的。你
+不能说**42.setValue(43)**.
+
+取而代之的是我们获得另外一个数字，它是将之前的数字加1后的结果。我们可以纯函数来实现。它的参数是当前的state并且它的返回值将作为下一个state
+被使用。下面是这个函数以及与它相关的单元测试：
+
+```
+// test/immutable_spec.js
+
+import {expect} from 'chai'
+
+describe('immutability', ()=> {
+  
+  describe('a number', ()=> {
+  
+    function increment(currentState) {
+      return currentState+1;
+    }
+    
+    it('is immutable', ()=> {
+      let state = 42;
+      let nextState = increment(state);
+      
+      expect(nextState).to.equal(43);
+      expect(state).to.equal(42);
+    });
+    
+  });
+  
+});
+```
+
+当调用increment时state不会改变的事实是显而易见的。怎么可能呢？数字是immutable!!!
+
+---
+
+你可能已经注意到这个测试和我们的应用程序完全无关——我们甚至没有任何应用程序代码！
+
+这个测试只是一个学习工具而已。我发现如果你打算研究一个新的API或者技术时，通过编写一些单元测试来证明一些想法是有用的，这正是我们在这里所
+做的。Kent Beck在它的[TDD书](https://www.amazon.com/Test-Driven-Development-By-Example/dp/0321146530)中称这种测试为“学习型测
+试”.
+
+---
