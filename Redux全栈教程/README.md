@@ -65,7 +65,6 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
 
 本APP将有两个独立的用户界面：投票UI可以适用于移动设备，或者其他可以使用浏览器的东西。投票结果UI设计为投影在投影仪或者其他大屏幕上。它将
 实时显示正在投票的结果。
-![vote_system](iamge/vote_system.png)
 
 ![vote_system1](image/vote_system1.png)
 
@@ -119,7 +118,7 @@ about the application state in isolation from the application's behavior).State�
 
 当第一次投票开始，此时应该有一些方式来区分哪个是当前被投票的。在这种情况下，应该有一个vote entry在state中，它保留着目前处于投票状态的
 物品对。物品对或许应该从entries集合中拿出来。
-！[vote_server_tree_pair](image/vote_server_tree_pair.png)
+![vote_server_tree_pair](image/vote_server_tree_pair.png)
 
 在投票开始之后，票数也应该被存储起来。我们可以用vote中另外的数据结构来做这件事。
 ![vote_server_tree_tally](image/vote_server_tree_tally.png)
@@ -229,7 +228,7 @@ chai.use(charImmutable);
 这意味着应用程序的任意两个连续状态是存储在两个分开且独立的树中(separate and independent)。从一个状态跳到下一状态是通过执行一个函数，它
 会获取当前的状态并返回一个新的状态。
 
-！[此处缺图]()
+![vote_state_succession.png](image/vote_state_succession.png)
 
 这为什么会是好想法呢？ 人们首先提到的是如果你拥有一棵树中所有的state,并且进行了一些非破坏性的更新，你可以不需要坐太多额外的工作来保存应用
 程序的历史： 仅需要保留以前state trees的集合。然后你可以执行 undo/redo 等“免费”操作——只需要将当前应用程序状态设置为历史记录中的上一个
@@ -295,3 +294,210 @@ describe('immutability', ()=> {
 试”.
 
 ---
+
+我们接下来要做的是拓展这种不变量的想法到所有类型的数据结构中，而不仅仅是数字。
+
+例如，一个应用程序的state是一系列的电影，我们可以使用Immutable的list。添加一部电影生成新的电影列表的操作是通过将旧的电影列表和新的电影
+相结合来完成的。至关重要的是，旧的电影列表在操作后仍然没有改变。
+
+```
+// test/immutable_spec1.js
+
+/**
+ * Created by qixin on 27/11/2016.
+ */
+
+import {expect} from 'chai';
+import {List} from 'immutable';
+
+describe('immutability', () => {
+
+    //..
+
+    describe('A list', () => {
+
+        function addMovie(currentState, movie) {
+            return currentState.push(movie);
+        };
+
+        it('is immutable', () => {
+            let state = List.of('Transplotting', '28 Days Later');
+            let nextState = addMovie(state, 'Sunshine');
+
+            expect(nextState).to.equal(List.of(
+                'Transplotting',
+                '28 Days Later',
+                'Sunshine'
+            ));
+            expect(state).to.equal(List.of(
+                'Transplotting',
+                '28 Days Later'
+            ));
+        });
+
+    });
+
+});
+
+```
+如果我们向普通的数组中push一项之后，旧的state是不会保持不变的！因为我们使用了Immutable List来替代，我们就有了与number示例一样的语义。
+
+这个想法扩展到整个state tree也是如此。一个state tree只是由Lists, Maps或者一些其他类型的集合嵌套形成的。在它上面进行操作相当于生成一颗
+新的state tree,并保留下来旧的state tree. 如果state tree是一个Map,里面有一个键'Movie'指向了一个电影列表，添加一部电影意味着我们需要
+新创建一个map,键'Movie'指向一个新的lis：
+```
+// test/immutable_spec2.js
+
+/**
+ * Created by qixin on 27/11/2016.
+ */
+import {expect} from 'chai';
+import {List, Map} from 'immutable';
+
+describe('immutability', () => {
+
+    //..
+
+    describe('a tree', () => {
+
+        function addMovie(currentState, movie) {
+            return currentState.set(
+                'movies',
+                currentState.get('movies').push(movie)
+            );
+        };
+
+        it('is immutable', ()=> {
+           let state = Map({
+              movies: List.of(
+                  'Transplotting',
+                  '28 Days Later'
+              )
+           });
+           let nextState = addMovie(state, 'Sunshine');
+
+           expect(nextState).to.equal(Map({
+               movies: List.of(
+                   'Transplotting',
+                   '28 Days Later',
+                   'Sunshine'
+               )
+           }));
+           expect(state).to.equal(Map({
+               movies: List.of(
+                   'Transplotting',
+                   '28 Days Later'
+               )
+           }));
+        });
+
+    });
+
+})
+```
+这和之前的操作是同样的方法，仅仅是为了拓展展示在嵌套的数据结构中同样有效。同样的想法适用于所有类型和大小的数据。
+
+对于如此类的嵌套数据结构的操作，immutable提供了几个帮助函数，可以更容易的"到达"嵌套数据结构来产生新的值。在
+这种情况下，我们可以使用update函数来使代码更加简洁：
+```
+// test/immutable_spec3.js
+
+fuction addMovie(currentState, movie) {
+  return currentState.update('movies', movies => movies.push(movie));
+};
+```
+上述例子可以让我们了解immutable数据。它将被用作我们应用程序的state. 还有很多功能包含在immutable API中，我们
+仅仅简单的介绍一些"皮毛"。
+
+---
+
+虽然immutable data是Redux体系架构中的关键点，但是使用Immutable库并不是必须的。事实上，在Redux官方文档中大部
+分使用的还是plain old JavaScript objects和数组，简单的避免按照惯例改变它们的值。
+
+在这篇教程中，我们使用Immutable库来代替它，主要有以下几个原因：
+* Immutable`s data structures是从头开始设计被用来不可变使用，因此提供了一些使immutable操作更方便的API。
+* 我赞同Rich Hickey的观点[there is no such as things as immutability by convention](http://codequarterly.com/2011/rich-hickey/)
+。如果你使用可变的数据结构，你或者其他人迟早会错误地改变它们。当你刚刚开始的时候尤其如此，像object.freeze()这类
+东西可能会有帮助。
+* Immutable·s data structure是持久的([persistent](https://en.wikipedia.org/wiki/Persistent_data_structure))
+，这意味着它们是内部结构化的，使得新的版本在时间和存储上都是高效的，即使对于大型的state tree也是如此。使用plain
+objects和数组可能会造成过量的复制，这会降低性能。
+
+---
+
+### 使用纯函数编写逻辑层
+
+在了解了immutable state trees和在树上进行操作的纯函数。我们可以将我们的注意力转移到投票系统的逻辑层上。应用程序
+的核心将由我们一直在讨论的部分组成：一个tree structure以及一些产生新版tree structure的函数。
+
+#### 加载条目(loading entries)
+
+首先，正如我们前面所讨论的，应用程序允许"加载"一系列想要被投票的条目。我们应该有一个**setEntries**函数，它可以获取之
+前的state和一系列条目，生成一个包括所有条目的state,下面是相关的测试代码：
+```
+/**
+ * Created by qixin on 27/11/2016.
+ */
+
+import {List, Map} from 'immutable';
+import {expect} from 'chai';
+
+import {setEntries} from '../src/core';
+
+describe('application logic', () => {
+
+    describe('setEntries', () =>{
+
+        it('add the entries to the state', () => {
+           const state = Map();
+           const entries = List.of('Transplotting', '28 Days Later');
+           const nextState = setEntries(state, entries);
+           expect(nextState).to.equal(Map({
+               entries: List.of('Transplotting', '28 Days Later')
+           }));
+        });
+    });
+})
+```
+
+**setEntries**的最初实现尽可能做最简单的事情：它可以在Map中设置一项键为'entries'，值为给定的一系列entries.这
+生成了我们之前设计的第一个state tree.
+
+```
+/**
+ * Created by qixin on 27/11/2016.
+ */
+export function setEntries(state, entries) {
+    return state.set('entries', entries);
+}
+
+```
+
+为了方便，我们允许输入的条目是一个普通的js数组(或者是其他可迭代的集合)。当在state tree中，它仍然是一个immutable List。
+
+```
+// test/core.js
+
+        it('converts to immutable', () =>{
+            const state = Map();
+            const entries = ['Transplotting', '28 Days Later'];
+            const nextState = setEntries(state, entries);
+            expect(nextState).to.equal(Map({
+                entries: List.of('Transplotting', '28 Days Later')
+            }));
+        });
+```
+在实现中，我们应该传递给定的entries给List构造器来满足这个需求：
+```
+/**
+ * Created by qixin on 27/11/2016.
+ */
+import {List} from 'immutable';
+
+
+export function setEntries(state, entries) {
+    return state.set('entries', List(entries));
+}
+
+
+```
