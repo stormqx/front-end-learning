@@ -29,4 +29,4 @@ describe('application logic', () => {
             }));
         });
     });
-})
+});

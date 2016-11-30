@@ -501,3 +501,323 @@ export function setEntries(state, entries) {
 
 
 ```
+
+### 开始投票
+在已经拥有entries set的state上，调用next函数后我们开始投票。这意味着，从我们设计的状态树的第一个到第二个(图1 --- 图2)。
+
+函数不需要额外的参数。在state中应该建立一个**vote** Map, 并且两个条目包含在键为pair的键值对中。处于投票阶段的条目不应
+该再出现在entries List中。
+
+```
+// test/core_spec1.js
+
+/**
+ * Created by qixin on 30/11/2016.
+ */
+
+import {List, Map} from 'immutable';
+import {expect} from 'chai';
+import {setEntries, next, mapTest1} from '../src/core';
+
+
+describe('application logic', () => {
+
+    //..
+
+    describe('next', () => {
+
+        it('take the next two entries under vote', () => {
+            const state = Map({
+                entries: List.of('Transpotting', '28 Days Later', 'Sunshine')
+            });
+            const nextState = next(state);
+            expect(nextState).to.equal(Map({
+                vote: Map({
+                    pair: List.of('Transpotting', '28 Days Later')
+                }),
+                entries: List.of('Sunshine')
+            }));
+        });
+
+    });
+
+});
+```
+实现这个操作将会[merge](https://facebook.github.io/immutable-js/docs/#/Map/merge)一个更新进old state,更新包括
+将头两个条目放到一个List中，其他在仍存放在新版的**entries**中：
+```
+// test/core.js
+
+import {List, Map} from 'immutable';
+
+//...
+
+export function next(state) {
+    const entries = state.get('entries');
+    return state.merge({
+        vote: Map({pair: entries.take(2)}),
+        entries: entries.skip(2)
+    });
+}
+```
+
+### 投票
+当一个投票进行时，应该可以让人们对条目进行投票。当对一个条目进行新的投票时，它的"计数"（tally)也应该出现在投票中。如果一个
+条目已经有了计数，它应该被增加：
+```
+// test/core_spec3.js
+
+/**
+ * Created by qixin on 30/11/2016.
+ */
+
+import {List, Map} from 'immutable';
+import {expect} from 'chai';
+import {setEntries, next, vote} from '../src/core';
+
+describe('application logic', () => {
+
+    //..
+
+    describe('vote', () => {
+
+        it('creates a tally for the voted entry', () => {
+            const state = Map({
+                vote: Map({
+                    pair: List.of('Transplotting', '28 Days Later')
+                }),
+                entries: List()
+            });
+
+            const nextState = vote(state, 'Transplotting');
+            expect(nextState).to.equal(Map({
+                vote: Map({
+                    pair: List.of('Transplotting', '28 Days Later'),
+                    tally: Map({
+                        'Transplotting': 1
+                    })
+                }),
+                entries: List()
+            }));
+        });
+
+        it('adds to existing tally for the voted entry', () => {
+            const state = Map({
+                vote: Map({
+                    pair: List.of('Transplotting', '28 Days Later'),
+                    tally: Map({
+                        'Transplotting': 3,
+                        '28 Days Later': 2
+                    })
+                }),
+                entries: List()
+            })
+
+            const nextState = vote(state, 'Transplotting');
+            expect(nextState).to.equal(Map({
+                vote: Map({
+                    pair: List.of('Transplotting', '28 Days Later'),
+                    tally: Map({
+                        'Transplotting': 4,
+                        '28 Days Later': 2
+                    })
+                }),
+                entries: List()
+            }));
+
+        });
+    });
+});
+```
+
+---
+ 
+ 你可以使用Immutable中的[fromJS](https://facebook.github.io/immutable-js/docs/#/fromJS)函数更简洁的构建这些嵌
+ 套的Maps和Lists。
+
+---
+
+我们可以下面的代码来通过这些测试：
+```
+// test/core.js
+
+export function vote(state, entry) {
+    return state.updateIn(
+        ['vote', 'tally', entry],
+        0,
+        tally => tally+1
+    );
+}
+```
+使用[updateIn](https://facebook.github.io/immutable-js/docs/#/Map/updateIn)是多么的优雅！这段代码的意思是"进入
+潜逃路由结构路径['vote', 'tally', 'Transplotting'], 并且在这里应用该函数。如果在路径中有键不存在，将会在该位置创建
+新的Maps。如果最后的值缺失，用"0"来进行初始化。
+
+它包装了很多层(It packs a lot of punch)，但这正是让我们可以愉快得使用Immutable data structures的那类代码，因此花点
+时间来熟悉它是值得的。
+```
+updateIn()
+
+updateIn(keyPath: Array<any>, updater: (value: any) => any): Map<K, V>
+updateIn(
+    keyPath: Array<any>,
+    notSetValue: any,
+    updater: (value: any) => any
+): Map<K, V>
+
+updateIn(keyPath: Iterable<any, any>, updater: (value: any) => any): Map<K, V>
+
+updateIn(
+    keyPath: Iterable<any, any>,
+    notSetValue: any,
+    updater: (value: any) => any
+): Map<K, V>
+```
+
+### 开始下一对
+
+一旦关于一对条目的投票结束，我们应该开展下一对条目的投票。当前投票结果获胜的条目应该被保存，并且添加在entries的最后，以便
+后来仍然可以被用来与其他条目配对pk。如果票数相同，两个条目都应该保存。
+
+我们在已经实现的**next**函数中添加这个逻辑：
+```
+/**
+ * Created by qixin on 30/11/2016.
+ */
+
+import {List, Map, fromJS} from 'immutable';
+import {expect} from 'chai';
+import {next} from '../src/core';
+
+describe("application logic", () => {
+
+    //..
+
+   describe('winnerAndNext', () => {
+
+       it('put winner of current vote back to entries', () => {
+           const state = fromJS({
+               vote: {
+                   pair: ['Transplotting', '28 Days Later'],
+                   tally: {
+                       'Transplotting': 4,
+                       '28 Days Later': 2
+                   }
+               },
+               entries: ['Sunshine', 'Millions', '127 Hours']
+           });
+
+           const nextState = next(state);
+           expect(nextState).to.equal(fromJS({
+               vote: {
+                   pair: ['Sunshine', 'Millions']
+               },
+               entries: ['127 Hours', 'Transplotting']
+           }));
+       });
+
+       it('puts both from tied vote back to entries', () => {
+           const state = Map({
+               vote: Map({
+                   pair: List.of('Trainspotting', '28 Days Later'),
+                   tally: Map({
+                       'Trainspotting': 3,
+                       '28 Days Later': 3
+                   })
+               }),
+               entries: List.of('Sunshine', 'Millions', '127 Hours')
+           });
+           const nextState = next(state);
+           expect(nextState).to.equal(Map({
+               vote: Map({
+                   pair: List.of('Sunshine', 'Millions')
+               }),
+               entries: List.of('127 Hours', 'Trainspotting', '28 Days Later')
+           }));
+       });
+   });
+});
+
+```
+在实现中，我们只是将当前投票的“获胜者”连接到entries后面.我们可以使用getWinners新功能找到这些赢家：
+```
+// src/core.js
+
+function getWinners(vote) {
+  if (!vote) return [];
+  const [a, b] = vote.get('pair');
+  const aVotes = vote.getIn(['tally', a], 0);
+  const bVotes = vote.getIn(['tally', b], 0);
+  if      (aVotes > bVotes)  return [a];
+  else if (aVotes < bVotes)  return [b];
+  else                       return [a, b];
+}
+
+export function next(state) {
+  const entries = state.get('entries')
+                       .concat(getWinners(state.get('vote')));
+  return state.merge({
+    vote: Map({pair: entries.take(2)}),
+    entries: entries.skip(2)
+  });
+}
+```
+
+### 结束投票
+在某一时刻，当投票结束时将只剩下一个条目。这时我们将有一个获胜的entry.我们应该做的不是试图形成下一个
+投票，而是明确的在state中设置赢者。与此同时，投票结束了。
+```
+// test/core_spec5.js
+
+describe('next', () => {
+
+  // ...
+
+  it('marks winner when just one entry left', () => {
+    const state = Map({
+      vote: Map({
+        pair: List.of('Trainspotting', '28 Days Later'),
+        tally: Map({
+          'Trainspotting': 4,
+          '28 Days Later': 2
+        })
+      }),
+      entries: List()
+    });
+    const nextState = next(state);
+    expect(nextState).to.equal(Map({
+      winner: 'Trainspotting'
+    }));
+  });
+
+});
+```
+在**next**的实现中，我们应该有一个特殊条件来处理当entries的大小变为1的情况：
+```
+// src/core.js
+
+export function next(state) {
+  const entries = state.get('entries')
+                       .concat(getWinners(state.get('vote')));
+  if (entries.size === 1) {
+    return state.remove('vote')
+                .remove('entries')
+                .set('winner', entries.first());
+  } else {
+    return state.merge({
+      vote: Map({pair: entries.take(2)}),
+      entries: entries.skip(2)
+    });
+  }
+}
+```
+我们在这里可以仅仅返回**Map({winner: entries.first()})**。但是我们并没有这么做，取而代之的是我们仍然
+接受old state做为起点并且明确的从中去除了键'vote'和'entries'。这么做的原因是面向未来的(future-proofing):
+在某些时候，我们可能在state中有一些不相关的数据，它应该不变地通过这个函数。这些状态转换函数中总是将old state
+渐变为new state而不是从头开始构建new state通常是个好主意。
+
+关于我们应用程序的核心逻辑，这里已经有了一个由几个函数组成的可接受版本。我们同样还有关于它们的单元测试，写这些
+测试是相对容易的：no setup, no mock, no stub. 这是纯函数的魅力。我们可以调用它们并检查返回值。
+
+注意：到目前为止，我们还没有安装redux. 我们可以全身心的投入到应用程序的逻辑中，不需要将"框架"带进来。这是一件
+非常令人愉快的事情。
