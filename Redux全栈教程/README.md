@@ -1,6 +1,6 @@
 ## Full-Stack Redux Tuturial（译）
 > 原文链接： [Full-Stack Redux Tuturial](http://teropa.info/blog/2015/09/10/full-stack-redux-tutorial.html)
-> 
+>
 >作者: [Tero Parviainen](http://teropa.info/) ([@teropa](https://twitter.com/teropa))
 
 ### 使用Redux, React,Immutable并且基于测试优先开发的综合指南
@@ -13,21 +13,21 @@ Redux是一个非常小的库，学习它的所有API并不是很困难。但是
 本教程将指导您从头开始构建一个全栈的Redux和ImmutableJs应用。我们将使用测试优先开发真实应用程序，该程序后端基于Node+Redux构建，前端基于
 React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack以及Mocha.它非常有趣，你可以在任何时候跟上它的节奏。
 
-<h3 id="1"> 目录</h3>
-* [目录](#1)
-* [你所需要的](#2)
-* App
-* 体系结构
-* 服务端应用程序
-  * 设计应用程序状态树(State Tree)
-  * 项目安装
-  * 熟悉不可变数据
-  * 使用纯函数编写逻辑层
-    * 加载实体
-    * 开始投票
-    * 投票中
-    * 移动到下一对
-    * 结束投票
+<h3 id="content"> 目录</h3>
+* [目录](#content)
+* [你所需要的](#What_You_Will_Need)
+* [App](#App)
+* [体系结构](#The_Architecture)
+* [服务端应用程序](#The_Server_Application)
+  * [设计应用程序State Tree](#Designing_The_Application_State_Tree)
+  * [项目安装](#Project_Setup)
+  * [熟悉不可变数据](#Getting_Comfortable_With_Immutable)
+  * [使用纯函数编写逻辑层](#Writing_The_Application_Logic_With_Pure_Functions)
+    * [加载条目](#Loading_Entries)
+    * [开始投票](#Starting_The_Vote)
+    * [投票中](#Voting)
+    * [开始下一对](#Moving_to_The_Next_Pair)
+    * [结束投票](#Ending_The_Vote)
   * 介绍 Actions 和 Reducers
   * 组合 Reducers 的味道
   * 介绍Redux Store
@@ -45,17 +45,17 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
   * 从服务端接收Actions
   * 从react组件分发Actions
   * 使用Redux中间件向服务端发送Actions
-  
-<h3 id="2"> 你所需要的</h3>
+
+<h3 id="What_You_Will_Need"> 你所需要的</h3>
 
 本教程对知道如何编写JavaScript应用程序的工程师是最有用的。我们将使用Node,ES6, React, Webpack和Babel,因此如果你已经熟悉了这些工具,
 你学习接下来的内容应该不会遇到麻烦。否则，你应该先去学习一些相关基础知识。
 
 谈及工具,你只要有带有NPM的Node和一款喜欢的文本编辑器即可，事实就是这样。
 
-### APP
+<h3 id="App"> App</h3>
 
-我们将开发一款投票APP，它可以为党派、会议和聚会提供现场投票。   
+我们将开发一款投票APP，它可以为党派、会议和聚会提供现场投票。
 
 这个想法是，我们将有一系列要投票的东西： 电影、歌曲、编程语言、Horse JS quotes等任何东西。APP将它们成对放在一起PK，所以在每一轮人们都
 可以在二者中投票给喜欢的。当只剩下一个时，它便是胜者。
@@ -68,7 +68,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
 
 ![vote_system1](image/vote_system1.png)
 
-### 体系结构
+<h3 id="The_Architecture"> 体系结构</h3>
 
 本系统在技术上由两部分组成：基于React的浏览器APP提供用户界面和一个服务器应用程序，我们使用Node处理投票逻辑。两者之间使用WebSockets进行
 通信。
@@ -83,7 +83,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
 
 ---
 
-### 服务端应用程序
+<h3 id="The_Server_Application"> 服务端应用程序</h3>
 
 我们打算先编写Node程序，之后再编写React程序。这可以使我们在开始思考UI界面前专注于核心逻辑。
 
@@ -92,7 +92,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
 
 我推荐跟着教程从头开始写APP，但是如果你也可以选择直接从[github](https://github.com/teropa/redux-voting-server)上clone代码。
 
-### 设计应用程序状态树(Designing The Application State Tree)
+<h3 id="Designing_The_Application_State_Tree"> 设计应用程序State Tree</h3>
 
 设计一个Redux应用程序经常从考虑应用程序的state开始。它描述了在任何给定的时间，您的应用程序将要发生什么。
 
@@ -133,7 +133,7 @@ entry同样会被放在vote中。
 这看起来似乎是一种可行的设计。有很多不同的方法来设计这些要求的state，这可能不是最佳的。但是这并不重要。只需要在开始的时候足够好就行，
 重要的是我们已经建立了一种具体的应用程序该如何执行任务的想法。这是我们甚至没有考虑任何代码之前就完成的！
 
-### 项目安装
+<h3 id='Project_Setup)'> 项目安装</h3>
 
 说了这么多废话，是时候开始干活了。在我们做任何事情之前，我们需要建立一个项目目录并且初始化它作为一个NPM项目：
 ```
@@ -215,7 +215,7 @@ chai.use(charImmutable);
 ```
 这就是我们在开始阶段所有需要安装的！！！
 
-### 熟悉不可变数据
+<h3 id="Getting_Comfortable_With_Immutable"> 熟悉不可变数据</h3>
 
 关于Redux架构的第二个重点是，state不仅仅是一颗树，实际上他是一个immutable tree.
 
@@ -263,23 +263,23 @@ Immutable data structures是我们建立应用程序state需要用的材料。�
 import {expect} from 'chai'
 
 describe('immutability', ()=> {
-  
+
   describe('a number', ()=> {
-  
+
     function increment(currentState) {
       return currentState+1;
     }
-    
+
     it('is immutable', ()=> {
       let state = 42;
       let nextState = increment(state);
-      
+
       expect(nextState).to.equal(43);
       expect(state).to.equal(42);
     });
-    
+
   });
-  
+
 });
 ```
 
@@ -425,12 +425,12 @@ objects和数组可能会造成过量的复制，这会降低性能。
 
 ---
 
-### 使用纯函数编写逻辑层
+<h3 id="Writing_The_Application_Logic_With_Pure_Functions"> 使用纯函数编写逻辑层</h3>
 
 在了解了immutable state trees和在树上进行操作的纯函数。我们可以将我们的注意力转移到投票系统的逻辑层上。应用程序
 的核心将由我们一直在讨论的部分组成：一个tree structure以及一些产生新版tree structure的函数。
 
-#### 加载条目(loading entries)
+<h3 id="loading_entries"> 加载条目</h3>
 
 首先，正如我们前面所讨论的，应用程序允许"加载"一系列想要被投票的条目。我们应该有一个**setEntries**函数，它可以获取之
 前的state和一系列条目，生成一个包括所有条目的state,下面是相关的测试代码：
@@ -502,7 +502,8 @@ export function setEntries(state, entries) {
 
 ```
 
-### 开始投票
+<h3 id="Starting_The_Vote"> 开始投票</h3>
+
 在已经拥有entries set的state上，调用next函数后我们开始投票。这意味着，从我们设计的状态树的第一个到第二个(图1 --- 图2)。
 
 函数不需要额外的参数。在state中应该建立一个**vote** Map, 并且两个条目包含在键为pair的键值对中。处于投票阶段的条目不应
@@ -561,7 +562,8 @@ export function next(state) {
 }
 ```
 
-### 投票
+<h3 id="Voting"> 投票中</h3>
+
 当一个投票进行时，应该可以让人们对条目进行投票。当对一个条目进行新的投票时，它的"计数"（tally)也应该出现在投票中。如果一个
 条目已经有了计数，它应该被增加：
 ```
@@ -631,7 +633,7 @@ describe('application logic', () => {
 ```
 
 ---
- 
+
  你可以使用Immutable中的[fromJS](https://facebook.github.io/immutable-js/docs/#/fromJS)函数更简洁的构建这些嵌
  套的Maps和Lists。
 
@@ -674,7 +676,7 @@ updateIn(
 ): Map<K, V>
 ```
 
-### 开始下一对
+<h3 id="Moving_to_The_Next_Pair"> 开始下一对</h3>
 
 一旦关于一对条目的投票结束，我们应该开展下一对条目的投票。当前投票结果获胜的条目应该被保存，并且添加在entries的最后，以便
 后来仍然可以被用来与其他条目配对pk。如果票数相同，两个条目都应该保存。
@@ -763,7 +765,8 @@ export function next(state) {
 }
 ```
 
-### 结束投票
+<h3 id="Ending_The_Vote"> 结束投票</h3>
+
 在某一时刻，当投票结束时将只剩下一个条目。这时我们将有一个获胜的entry.我们应该做的不是试图形成下一个
 投票，而是明确的在state中设置赢者。与此同时，投票结束了。
 ```
