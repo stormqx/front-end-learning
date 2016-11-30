@@ -13,9 +13,9 @@ Redux是一个非常小的库，学习它的所有API并不是很困难。但是
 本教程将指导您从头开始构建一个全栈的Redux和ImmutableJs应用。我们将使用测试优先开发真实应用程序，该程序后端基于Node+Redux构建，前端基于
 React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack以及Mocha.它非常有趣，你可以在任何时候跟上它的节奏。
 
-### 目录
+<h3 id="1"> 目录</h3>
 * [目录](#1)
-* 你所需要的
+* [你所需要的](#2)
 * App
 * 体系结构
 * 服务端应用程序
@@ -46,7 +46,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
   * 从react组件分发Actions
   * 使用Redux中间件向服务端发送Actions
   
-### 你所需要的
+<h3 id="2"> 你所需要的</h3>
 
 本教程对知道如何编写JavaScript应用程序的工程师是最有用的。我们将使用Node,ES6, React, Webpack和Babel,因此如果你已经熟悉了这些工具,
 你学习接下来的内容应该不会遇到麻烦。否则，你应该先去学习一些相关基础知识。
