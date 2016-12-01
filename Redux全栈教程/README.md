@@ -28,7 +28,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
     * [投票中](#Voting)
     * [开始下一对](#Moving_to_The_Next_Pair)
     * [结束投票](#Ending_The_Vote)
-  * 介绍 Actions 和 Reducers
+  * [介绍 Actions 和 Reducers](#Introducing_Actions_and_Reducers)
   * 组合 Reducers 的味道
   * 介绍Redux Store
   * 设置Socket.io服务器
@@ -824,3 +824,227 @@ export function next(state) {
 
 注意：到目前为止，我们还没有安装redux. 我们可以全身心的投入到应用程序的逻辑中，不需要将"框架"带进来。这是一件
 非常令人愉快的事情。
+
+<h3 id='Introducing_Actions_and_Reducers'> 介绍 Actions 和 Reducers</h3>
+
+我们已经有了应用程序的核心函数，但是在Redux中，你实际上不需要直接调用这些函数。在函数和外部世界之间还有一个中间
+层： Actions。
+
+Action是一种简单的数据结构，描述了应用程序中应该发生的变化。它基本上描述了一个包装成小对象的函数调用。按照惯例，
+每一个action都有type属性，它描述了动作的操作。Action也可能携带其他属性。下面是几个与我们的核心函数相匹配的样例
+Action。
+```
+{type: 'SET_ENTRIES', entries: ['Transplotting', '28 Days Later']}
+
+{type: 'NEXT' }
+
+{type: 'VOTE', entry: 'Transplotting'}
+```
+如果actions使用这种写法，我们同样需要一种方式将它们转换成实际的核心函数调用。例如，对于**VOTE** action,应进行
+以下调用：
+```
+// this action
+let voteAction = {type: 'VOTE', entry: 'Transplotting'};
+// should cause this to happen
+return vote(state, voteAction.entry);
+```
+我们将要写的是能够根据当前state进行任何action的通用函数，并且能够调用与action相匹配的核心函数。这个函数被称为：
+reducer:
+```
+// src/reducer.js
+
+/**
+ * Created by qixin on 01/12/2016.
+ */
+export default function reducer(state, action) {
+    //figure out which function to call and call it
+}
+```
+
+我们应该测试reducer确实能够处理我们的三个action:
+```
+// test/reducer_spec.js
+
+/**
+ * Created by qixin on 01/12/2016.
+ */
+
+import {Map, fromJS} from 'immutable';
+import {expect} from 'chai';
+
+import reducer from '../src/reducer';
+
+describe('reducer', () => {
+
+    it('handle SET_ENTRIES', () => {
+       const initialState = Map();
+       const action = {type: 'SET_ENTRIES', entries: ['Transplotting', '28 Days Later']};
+       const nextState = reducer(initialState, action);
+
+       expect(nextState).to.equal(fromJS({
+           entries: ['Transplotting', '28 Days Later']
+       }));
+    });
+
+    it('handle NEXT', () => {
+        const initialState = fromJS({
+            entries: ['Transplotting', '28 Days Later']
+        });
+        const action = {type: 'NEXT'};
+        const nextState = reducer(initialState, action);
+
+        expect(nextState).to.equal(fromJS({
+            vote:{
+                pair: ['Transplotting', '28 Days Later']
+            },
+            entries: []
+        }));
+    });
+
+    it('handle VOTE', () => {
+        const initialState = fromJS({
+            vote: {
+                pair: ['Transplotting', '28 Days Later']
+            },
+            entries: []
+        });
+        const action = {type: 'VOTE', entry: 'Transplotting'};
+        const nextState = reducer(initialState, action);
+
+        expect(nextState).to.equal(fromJS({
+            vote: {
+                pair: ['Transplotting', '28 Days Later'],
+                tally: {
+                    'Transplotting' : 1
+                }
+            },
+            entries: []
+        }));
+    });
+
+});
+```
+
+
+一个reducer应该根据action的类型委托相应的核心函数。它还知道如何从每个action对象中解压出每个函数的附加参数:
+```
+// src/reducer.js
+
+/**
+ * Created by qixin on 01/12/2016.
+ */
+import {setEntries, next, vote} from './core'
+
+export default function reducer(state, action) {
+    //figure out which function to call and call it
+    switch (action.type) {
+        case 'SET_ENTRIES':
+            return setEntries(state, action.entries);
+        case 'NEXT':
+            return next(state);
+        case 'VOTE':
+            return vote(state, action.entry);
+    }
+    return state;
+}
+```
+注意：如果reducer不能识别the action, 它将会返回当前state.
+
+Reducer另外一个重要的要求是如果它们以未定义的状态被调用时，它们知道如何将其初始化为有意义的值。在我们这种条件
+下，初始值是Map。因此，给定一个未定义状态就等于给定一个空的Map,同样是有效的。
+```
+// test/reducer_spec1.js
+
+/**
+ * Created by qixin on 01/12/2016.
+ */
+import {Map, fromJS} from 'immutable';
+import {expect} from 'chai';
+
+import reducer from '../src/reducer';
+
+describe('reducer', () => {
+
+    //..
+
+    it('initial a undefined state', () => {
+        const action = {type: 'SET_ENTRIE', entries: ['Transplotting']};
+        const nextState = reducer(undefined, action);
+
+        expect(nextState).to.equal(fromJS({
+            entries: ['Transplotting']
+        }));
+    });
+});
+```
+因为我们应用程序的逻辑存放在**core.js**中，在这里引入初始state是有道理的：
+```
+// src/core.js
+
+export const INITIAL_STATE = Map();
+```
+
+在reducer中，我们导入它，并且将它做为state参数的默认值：
+
+```
+/**
+ * Created by qixin on 01/12/2016.
+ */
+import {setEntries, next, vote, INITIAL_STATE} from './core'
+
+export default function reducer(state = INITIAL_STATE, action) {
+    //figure out which function to call and call it
+    switch (action.type) {
+        case 'SET_ENTRIES':
+            return setEntries(state, action.entries);
+        case 'NEXT':
+            return next(state);
+        case 'VOTE':
+            return vote(state, action.entry);
+    }
+    return state;
+}
+```
+关于这个reducer的工作方式有趣的是给定任何类型的action,它如何能够普遍的用于将应用程序的一个状态切换到
+下一个。给定一个历史state的集合，你实际上可以通过[reduce](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
+集合到当前state.这也是为什么函数被称为reducer: 它满足了reduce回调函数的约定。
+```
+// test/reducer_spec2.js
+
+/**
+ * Created by qixin on 01/12/2016.
+ */
+
+import {Map, fromJS} from 'immutable';
+import {expect} from 'chai';
+
+import reducer from '../src/reducer';
+
+describe('reducer', () => {
+
+    it('can be used with reduce', () => {
+        const actions = [
+            {type: 'SET_ENTRIES', entries: ['Trainspotting', '28 Days Later']},
+            {type: 'NEXT'},
+            {type: 'VOTE', entry: 'Trainspotting'},
+            {type: 'VOTE', entry: '28 Days Later'},
+            {type: 'VOTE', entry: 'Trainspotting'},
+            {type: 'NEXT'}
+        ];
+
+        const finalState = actions.reduce(reducer, Map());
+        expect(finalState).to.equal(fromJS({
+            winner: 'Trainspotting'
+        }));
+    });
+});
+```
+与直接调用核心函数相比，批量(batch) 和／或 重放(replay) action集合的能力是action/reducer状态转换模型
+的主要优点。例如，给定actions是可以序列化成JSON的对象，你可以轻易的将它们发送到Web Worker,并在那里运行
+你的reducer逻辑。或者你甚至可以通过网络来发送它们，这也是我们后面会做的！
+
+---
+
+注意：我们使用普通对象而不是immutable data来作为action, 实际上这是Rudex需要我们做的。
+
+---
