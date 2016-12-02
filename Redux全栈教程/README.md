@@ -29,7 +29,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
     * [开始下一对](#Moving_to_The_Next_Pair)
     * [结束投票](#Ending_The_Vote)
   * [介绍 Actions 和 Reducers](#Introducing_Actions_and_Reducers)
-  * 组合 Reducers 的味道
+  * [组合 Reducers 的味道](#A_Taste_of_Reducer_Composition)
   * 介绍Redux Store
   * 设置Socket.io服务器
   * 广播来自Redux监听器的状态
@@ -1048,3 +1048,107 @@ describe('reducer', () => {
 注意：我们使用普通对象而不是immutable data来作为action, 实际上这是Rudex需要我们做的。
 
 ---
+
+<h3 id='A_Taste_of_Reducer_Composition'> 组合 Reducers 的味道</h3>
+
+我们目前定义的核心函数是每个函数都获取应用程序的整个state,然后返回应用程序下一个完整的state.
+
+我们可以很容易理解为什么在大型程序中保持这种模式不是一个好的想法。如果应用程序中的每个操作都需要知道整个
+state的结构，它会变得很脆弱。如果你想改变state的形状，需要修改大量的地方。
+
+更好的想法是，每当可以操作的时候，尽量是操作进行在最小的一块state(或者子树)。 我们讨论的是模块化：让处理
+一小部分state的函数只对那一小部分state进行操作，仿佛剩下的state不存在一样。
+
+我们的应用程序太小了，所以没有这类问题，但是我们已经有了改进它的机会：**vote**函数是没有理由来接收应用程序
+整个state的，因为它仅仅对'vote'部分进行操作。它只需要知道这些东西就够了。我们可以修改已经写好的与**vote**
+相关的单元测试来实现这个想法：
+```
+// test/core_spec3.js
+
+/**
+ * Created by qixin on 30/11/2016.
+ */
+
+import {List, Map} from 'immutable';
+import {expect} from 'chai';
+import {vote} from '../src/core';
+
+describe('application logic', () => {
+
+    //..
+
+    describe('vote', () => {
+
+        it('creates a tally for the voted entry', () => {
+            const state = Map({
+                pair: List.of('Transplotting', '28 Days Later')
+            });
+
+            const nextState = vote(state, 'Transplotting');
+            expect(nextState).to.equal(Map({
+                pair: List.of('Transplotting', '28 Days Later'),
+                tally: Map({
+                    'Transplotting': 1
+                })
+            }));
+        });
+
+        it('adds to existing tally for the voted entry', () => {
+            const state = Map({
+                pair: List.of('Transplotting', '28 Days Later'),
+                tally: Map({
+                    'Transplotting': 3,
+                    '28 Days Later': 2
+                })
+            });
+
+            const nextState = vote(state, 'Transplotting');
+            expect(nextState).to.equal(Map({
+                pair: List.of('Transplotting', '28 Days Later'),
+                tally: Map({
+                    'Transplotting': 4,
+                    '28 Days Later': 2
+                })
+            }));
+
+        });
+    });
+});
+```
+
+正如我们所看到这，这么做同时简化了测试代码，这通常是个好预兆！
+
+**vote**函数实现部分现在只需要接收state中的vote部分，然后更新它的票数：
+```
+export function vote(voteState, entry) {
+    return voteState.updateIn(
+        ['tally', entry],
+        0,
+        tally => tally+1
+    );
+}
+```
+现在，选取与**vote**函数相关的一部分state变成了reducer的部分工作：
+```
+// src/reducer.js
+
+export default function reducer(state = INITIAL_STATE, action) {
+    //figure out which function to call and call it
+    switch (action.type) {
+        case 'SET_ENTRIES':
+            return setEntries(state, action.entries);
+        case 'NEXT':
+            return next(state);
+        case 'VOTE':
+            return state.update('vote',
+                                 voteState => vote(voteState, action.entry));
+    }
+    return state;
+}
+```
+
+这是这种模式的一个小例子，它在大型应用程序中变得越来越重要：main reducer函数只是传送lower-level reducer
+所需要的state。我们把 在state tree上找到正确位置的任务 和 将更新应用于该位置 分离开。
+
+[Redux documentation for reducers](http://redux.js.org/docs/basics/Reducers.html)对于这种reducer
+组成的模式有着更详细的描述，并且还描述了一些在大多数情况下使reducer组合更容易的帮助函数。

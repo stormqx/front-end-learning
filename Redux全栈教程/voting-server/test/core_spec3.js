@@ -14,46 +14,34 @@ describe('application logic', () => {
 
         it('creates a tally for the voted entry', () => {
             const state = Map({
-                vote: Map({
-                    pair: List.of('Transplotting', '28 Days Later')
-                }),
-                entries: List()
+                pair: List.of('Transplotting', '28 Days Later')
             });
 
             const nextState = vote(state, 'Transplotting');
             expect(nextState).to.equal(Map({
-                vote: Map({
-                    pair: List.of('Transplotting', '28 Days Later'),
-                    tally: Map({
-                        'Transplotting': 1
-                    })
-                }),
-                entries: List()
+                pair: List.of('Transplotting', '28 Days Later'),
+                tally: Map({
+                    'Transplotting': 1
+                })
             }));
         });
 
         it('adds to existing tally for the voted entry', () => {
             const state = Map({
-                vote: Map({
-                    pair: List.of('Transplotting', '28 Days Later'),
-                    tally: Map({
-                        'Transplotting': 3,
-                        '28 Days Later': 2
-                    })
-                }),
-                entries: List()
+                pair: List.of('Transplotting', '28 Days Later'),
+                tally: Map({
+                    'Transplotting': 3,
+                    '28 Days Later': 2
+                })
             });
 
             const nextState = vote(state, 'Transplotting');
             expect(nextState).to.equal(Map({
-                vote: Map({
-                    pair: List.of('Transplotting', '28 Days Later'),
-                    tally: Map({
-                        'Transplotting': 4,
-                        '28 Days Later': 2
-                    })
-                }),
-                entries: List()
+                pair: List.of('Transplotting', '28 Days Later'),
+                tally: Map({
+                    'Transplotting': 4,
+                    '28 Days Later': 2
+                })
             }));
 
         });
