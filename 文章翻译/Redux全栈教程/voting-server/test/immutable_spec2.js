@@ -15,7 +15,7 @@ describe('immutability', () => {
                 'movies',
                 currentState.get('movies').push(movie)
             );
-        };
+        }
 
         it('is immutable', ()=> {
            let state = Map({
@@ -43,4 +43,4 @@ describe('immutability', () => {
 
     });
 
-})
+});

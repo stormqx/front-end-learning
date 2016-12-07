@@ -13,7 +13,7 @@ describe('immutability', () => {
 
         function addMovie(currentState, movie) {
             return currentState.push(movie);
-        };
+        }
 
         it('is immutable', () => {
             let state = List.of('Transplotting', '28 Days Later');

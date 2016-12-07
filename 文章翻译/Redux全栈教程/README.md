@@ -30,13 +30,13 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
     * [结束投票](#Ending_The_Vote)
   * [介绍 Actions 和 Reducers](#Introducing_Actions_and_Reducers)
   * [组合 Reducers 的味道](#A_Taste_of_Reducer_Composition)
-  * 介绍Redux Store
-  * 设置Socket.io服务器
-  * 广播来自Redux监听器的状态
-  * 接收远程Redux Actions
-* 客户端应用程序
-  * 客户端项目安装
-    * 支持单元测试
+  * [介绍Redux Store](#Introducing_The_Redux_Store)
+  * [建立Socket.io服务器](#Setting_Up_a_Socket.io_Server)
+  * [广播来自Redux监听器的state](#Broadcasting_State_from_A_Redux_Listener)
+  * [接收远程Redux Actions](#Receiving_Remote_Redux_Actions)
+* [客户端应用程序](#The_Client_Application)
+  * [客户端项目安装](#Client_Project_Setup)
+    * [支持单元测试](#Unit_Testing_support)
   * React 以及 React热加载(react-hot-loader)
   * 编写投票界面UI
   * 编写投票结果界面UI以及处理路由
@@ -1152,3 +1152,588 @@ export default function reducer(state = INITIAL_STATE, action) {
 
 [Redux documentation for reducers](http://redux.js.org/docs/basics/Reducers.html)对于这种reducer
 组成的模式有着更详细的描述，并且还描述了一些在大多数情况下使reducer组合更容易的帮助函数。
+
+<h3 id='Introducing The Redux Store'> 介绍Redux Store</h3>
+现在我们有一个reduce, 接下来我们可以看看这是怎么插入Redux中的。
+
+正如我们所看到的，如果你拥有应用程序将要发生的所有action的集合, 你应该调用reduce。弹出应用程序的最终state。当然，
+通常你不会拥有所有actions的集合。它们将随着时间的推移而传播，正像现实世界中发生的: 当用户使用app时，当从网络中接收
+数据时，或者当超时触发时。
+
+为了应对这种实际情况，我们可以使用Redux Store。正如名字所蕴含的一样，它是存储随着时间推移你的应用程序state的对象。
+
+Redux Store用一个reducer函数进行初始化，例如我们已经实现的：
+```
+
+import {createStore} from 'redux';
+
+const store = createStore(reducer);
+```
+
+接下来你可以做的是分发(dispatch) actions到store中。Store将在内部使用你的reducer, 并将actions作用于当前state,然后
+存储并生成下一状态：
+```
+
+store.dispatch({type: 'NEXT'});
+```
+
+在任何时间点，你都可以从store内部获得当前的state:
+```
+store.getState();
+```
+
+我们将要建立并导出Redux Store到一个名为store.js的文件中。让我们首先测试它。我们可以通过它建立一个store, 读取它的初始state,
+分发action，并且看到已经改变的state:
+```
+/**
+ * Created by qixin on 04/12/2016.
+ */
+
+import {Map, fromJS} from 'immutable';
+import {expect} from 'chai';
+
+import makeStore from '../src/store';
+
+describe('store', () => {
+
+    it('is a Redux store configured with the corrent reducer', () => {
+
+        const store = makeStore();
+        expect(store.getState()).to.equal(Map());
+
+        store.dispatch({
+            type: 'SET_ENTRIES',
+            entries: ['Transplotting', '28 Days Later']
+        });
+
+        expect(store.getState()).to.equal(fromJS({
+            entries: ['Trainspotting', '28 Days Later']
+        }));
+
+    });
+
+});
+
+```
+在创建Store之前，我们需要将redux加入工程中:
+```
+
+npm install --save redux
+```
+接下来我们可以创建store.js文件，它只是简单了调用了createStore函数和之前的reducer.
+```
+// src/store.js
+
+
+import {createStore} from 'redux';
+import reducer from './reducer';
+
+export default function makeStore() {
+    return createStore(reducer);
+}
+```
+
+因此，Redux store将事物都联系在一起，我们可以使用它作为应用程序的中心点：它持有当前state,并且随着时间的推移,
+可以接收从一个版本到下一个版本演化的动作，使用我们编写的应用程序核心逻辑。
+
+---
+
+问：在Redux应用中，你需要多少变量？
+
+答：一个. store中的那一个。
+
+这种理念开始时听起来很可笑——如果你不太熟悉函数式编程。如何才能只使用一个变量来做任何有用的事情？
+
+但是实际上，我们并不需要任何其他的变量。在我们的应用程序中，current state tree是唯一随着时间变化的东西。其他
+的都是常量或者不可变数据。
+
+---
+
+我们的应用程序代码和Redux是如此的小，这是非常显著的。因为我们有一个通用的reducer方法，所以我们仅仅需要让Redux
+知道reducer。其他都是与我们自身相关的，与框架无关的，高度可移植和纯函数代码！
+
+如果我们现在为应用程序创建入口index.js, 我们可以让它创建和导出store:
+```
+// index.js
+
+import makeStore from './src/store';
+
+export const store = makeStore();
+
+```
+因为我们导出了store, 你现在可以启动一个node REPL(例如使用babel-node),require index.js文件，使用store与应用程序
+进行交互。
+
+<h3 id='Setting_Up_a_Socket.io_Server'> 建立Socket.io服务器</h3>
+
+我们的应用程序将作为一个单独的浏览器应用程序的服务器，提供用于投票和查看结果的UI.为了到达这个目的，我们需要一种客户端
+和服务器交流的方式。
+
+这应该是一个实时通讯app，因为投票者如果看到自己投票后立即产生了效果，会感觉非常有趣。出于这个因素，我们使用WebSocket
+进行通讯。更具体的，我们使用Socket.io库，为WebSocket提供了不错的抽象，它可以跨浏览器工作。它还为不支持WebSocket的
+客户端提供了多种回退机制。
+
+让我们在项目中添加Socket.i：
+```
+
+npm install --save socket.io
+```
+
+接下来，我们新建一个server.js文件，它导出一个创建socket.io服务器的函数。
+```
+import Server from 'socket.io';
+
+export default function startServer() {
+    const io = new Server().attach(8090);
+}
+```
+这里创建了一个socket.io服务器，是一个绑定了8090端口的正常http服务器。端口的选择是任意的，但是我们后面从客户端链接时
+需要匹配端口号。
+
+我们可以让index.js调用这个函数，因此当app启动时服务器同时被启动：
+```
+// index.js
+
+import creatStore from './src/store';
+import startServer from './src/server';
+
+export const store = makeStore();
+startServer();
+```
+如果我们在package.json文件中添加了start命令，我们让启动环节变得更简单一些：
+```
+
+"script": {
+    "start": "babel-node index.js",
+    "test": "mocha: --compilers js:babel-core/register --require ./test/test_helper.js --recursive",
+}   "test:watch": "npm run test -- --watch"
+
+```
+
+现在我们可以通过敲入下列命令简单的开启服务器(并创建Redux store：
+```
+npm run start
+```
+
+---
+
+**babel-node** 命令来自于之前安装的**babel-cli**包。它可以支持babel transpilling来运行node代码。它增加一些
+性能开销，因此一般在生产环境中不推荐使用，但它适用于我们教程的目的。
+
+---
+
+<h3 id='Broadcasting_State_from_A_Redux_Listener'> 广播来自Redux监听器的state</h3>
+
+我们有一个socket.io服务器和一个Redux state容器，但是我们还没有以任何方式整合它们。接下来我们要做的就是改变这种情况。
+
+我们的服务器应该能够让客户端知道应用程序的current state。(例如："哪个条目正在被投票"，"当前投票票数是多少"，"有胜利
+者吗?")。当发生变化时，它可以通过发送一个socket.io事件到所有已连接的客户端。
+
+我们怎么能知道发生改变了呢？好吧，Redux为了达到这个目的提供了一些东西：你可以 **subsrcibe** 一个Redux store。你可以
+提供一个函数来实现它，当state有可能改变时，这个函数在每次 **action** 应用后都会调用store。它本质上是store中state改
+变的回调(callback).
+
+我们将在startServer中实现这个，因此让我们首先给它Redux store:
+```
+// index.js
+
+import makeStore from './src/store';
+import {startServer} from './src/server';
+
+export const store = makeStore();
+startServer(store);
+
+```
+
+我们接下来要做的是向store subscribe一个监听器,这个store可以读取current state, 将其转化为普通javascript对象，将其
+作为socket.io服务器上的state action。结果是一个json序列化的状态快照通过所有活动的socket.io连接发送。
+```
+import Server from 'socket.io';
+
+
+export default function startServer() {
+    const io = new Server().attach(8090);
+}
+
+store.subscribe(
+    () => io.emit('state', store.getState.toJS())
+);
+```
+
+---
+
+当发生任何改变时，我们现在向所有人发布整个state。这可能导致大量的数据传输。可以想到很多优化方法(例如，只发送相关子集，
+发送diffs而不是状态快照snapshots...),但是现在这种实现的好处是容易编写，所以我们只是将它用于我们的示例程序。
+
+---
+
+为了当状态改变时发送状态快照(state snapshot)，对于客户端来说，当它们连接上应用程序立即接收到current state是有用的。
+这样可以立即同步客户端的state到最新的服务器state。
+
+我们可以在socket.io服务器上监听'connection'事件。每次客户端连接时都会获得一个。在事件监听器中，我们可以立即发送current
+state:
+```
+import Server from 'socket.io';
+
+
+export default function startServer() {
+    const io = new Server().attach(8090);
+}
+
+store.subscribe(
+    () => io.emit('state', store.getState.toJS())
+);
+
+io.on('connection', (socket) => {
+    socket.emit('state', store.getState().toJS());
+});
+```
+<h3 id='Receiving_Remote_Redux_Actions'> 接收远程Redux Actions</h3>
+
+除了向客户端发出应用程序的state,我们还能够接收来自客户端的更新：投票人将要投出选票，投票组织者将使用NEXT action向前推进
+比赛。
+
+我们使用的解决方法其实非常简单。我们做的只是让客户端发出 'action' event直接进入到Redux Store中：
+```
+// src/server.js
+
+import Server from 'socket.io';
+
+
+export default function startServer() {
+    const io = new Server().attach(8090);
+}
+
+store.subscribe(
+    () => io.emit('state', store.getState.toJS())
+);
+
+io.on('connection', (socket) => {
+    socket.emit('state', store.getState().toJS());
+    socket.on('action', store.dispatch.bind(store));
+});
+```
+
+这是我们开始超越"常规Redux"的地方，因为现在我们实际上接收remote actions进入store。然而，Redux架构可以让它很容易做到：
+因为actions都是简单的js对象，并且js对象很容易通过网络进行传输，我们立即得到了任何数量的用户都可以参与的投票的系统。这不是
+小小的壮举！
+
+---
+
+这里有一些明显的安全性考虑，我们允许任何已连接的socket.io服务器将任何actions分发到Redux store中。在大多数现实情况下，这里
+应该有一些防火墙。可能与[the Vert.x Event Bus Bridge](#http://vertx.io/docs/vertx-web/java/#_securing_the_bridge)
+不一样。具有身份验证机制的应用程序也应该在此处插入。
+
+---
+
+我们的服务器现在实际操作与以下类似：
+
+1. 一个客户端向服务器发送一个action.
+2. 服务器将action发送给Redux store.
+3. Store调用reducer, reducer执行与action相关的逻辑.
+4. Store执行服务器subscribe的监听函数.
+5. 服务器发送一个'state'事件.
+6. 所有已连接的client ——包括启动原始操作的那个—— 接收到新的state.
+
+在我们完成服务器之前，让我们为它加载一些测试条目，以便我们可以在整个系统运行时查看。我们可以添加**entries.json**文件列举出
+比赛条目。例如，Danny Boyle到目前为止的电影列表，随时替换您最喜欢的主题。
+```
+// entries.json
+
+[
+  "Shallow Grave",
+  "Trainspotting",
+  "A Life Less Ordinary",
+  "The Beach",
+  "28 Days Later",
+  "Millions",
+  "Sunshine",
+  "Slumdog Millionaire",
+  "127 Hours",
+  "Trance",
+  "Steve Jobs"
+]
+```
+
+我们可以将它加载到index.js文件中，然后通过调度**NEXT** action来开启投票。
+```
+// index.js
+
+import makeStore from './src/store';
+import {startServer} from './src/server';
+
+export const store = makeStore();
+startServer(store);
+
+store.dispatch({
+  type: 'SET_ENTRIES',
+  entries: require('./entries.json')
+});
+store.dispatch({type: 'NEXT'});
+```
+接下来，我们准备将我们的焦点转移到客户端应用程序。
+
+<h3 id='The_Client_Application'> 客户端应用程序</h3>
+
+在本教程的剩余部分，我们将编写一个React应用程序，它可以连接到我们现在拥有的服务器，并使投票系统对用户开放。
+
+我们将在客户端程序中再次使用Redu，这可能是Redux最常见的使用情况：作为React应用程序的基础引擎。我们已经看到
+Redux自身是如何工作的，很快我们会详细的了解到Redux如何适应react,如果使用它影响react程序设计。
+
+我推荐跟着下面的步骤从头开始编写app,但是如果你喜欢你也可以从[github](https://github.com/teropa/redux-voting-client)
+上面获得代码。
+
+<h3 id='Client_Project_Setup'> 客户端项目安装</h3>
+
+---
+
+2016-08-02 更新: 现在有一种比教程中讲的方法更简单、官方支持的方式来构建React+Webpack+Babel应用程序：
+[Create React App](https://facebook.github.io/react/blog/2016/07/22/create-apps-with-no-configuration.html)工具，
+我鼓励你跟着[getting started](https://github.com/facebookincubator/create-react-app#getting-started)的指导尝试一下，
+来代替我们教程里面的手动安装的方法.
+
+你需要[eject](https://github.com/facebookincubator/create-react-app#converting-to-a-custom-setup) 我们曾经用过的
+热加载和单元测试，因为现在这个工具还不支持这些。
+
+---
+
+首先我们需要做的是新建一个npm项目，和我们对服务器的做法类似。
+```
+
+mkdir voting-client
+cd voting-client
+npm init -y
+
+```
+
+我们的应用程序需要一个主页，让我们把它放在**dist/index.html**:
+
+```
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <div id="app"></div>
+    <script src="bundle.js"></script>
+</body>
+</html>
+```
+
+该页面包含一个id为app的<div>，我们将把应用程序放在这里。同时期望在同一目录下有一个名为bundle.js的javascript文件。
+
+让我们为这个应用程序也创建第一个js文件.这将是应用程序的入口文件。现在我们就简单的放入一个logging statement:
+```
+// src/index.js
+
+console.log('I`m alive');
+```
+
+为了简化客户端开发工作流，我们将使用[Webpack](http://webpack.github.io/)及其开发服务器,让我们在项目中添加它们:
+```
+npm install --save-dev webpack webpack-dev-server
+```
+
+---
+
+如果你之前没有安装它们，也要在全局安装相同的包，这样你就可以从命令行方便的启动它们：
+```
+npm install -g webpack webpack-dev-server
+```
+
+---
+
+接下来，在项目的根目录下添加一个Webpack配置文件，让它与我们已经创建的文件和目录匹配起来：
+```
+// webpack.config.js
+
+module.export ={
+
+    entry: ['./src/index.js'],
+
+    output: {
+        path: __dirname + '/dist',
+        publicPath: '/',
+        filename: 'bundle.js'
+    },
+
+    devServer: {
+        contentBase: './dist'
+    }
+};
+```
+这将找到我们的**index.js**入口点，并且将所有内容构建到**dist/bundle.js**中。它还将使用dist目录作为开发服务器的
+基础。
+
+现在你应该可以运行Webpack生成**bundle.js**:
+```
+webpack
+```
+
+现在你同样可以启动开发服务，之后测试网页(包括**index.js**中的logging statement)都可以在localhost:8080访问到。
+```
+webpack-dev-server
+```
+
+因为我们打算在客户端程序中使用ES6和React的JSX语法，我们需要一些相关工具。Babel知道如何处理它们，所以让我们添加它。
+我们需要Babel和它的Webpack loader.
+```
+npm install --save-dev babel-core babel-loader babel-preset-es2015 babel-preset-react
+```
+
+在**package.json**文件中，我们需要使Babel支持 ES6/ES2015 和 React JSX，可以通过激活我们已经安装的presets:
+```
+// package.json
+
+"babel": {
+    "presets": ["es2015", "react"]
+},
+```
+
+在webpack config文件中我们需要作出变化让Webpack可以沿着 **.js** 文件找到 **.jsx**文件,并且都通过Babel进行处理:
+```
+//webpack.config.js
+
+module.exports ={
+
+    entry: ['./src/index.js'],
+    module: {
+        loaders:[{
+            test: /\.jsx?$/,
+            exclude: /node_modules/,
+            loader: 'babel'
+        }]
+    },
+    resolve: {
+        extensions: ['', '.js', '.jsx']
+    },
+    output: {
+        path: __dirname + '/dist',
+        publicPath: '/',
+        filename: 'bundle.js'
+    },
+    devServer: {
+        contentBase: './dist'
+    }
+};
+```
+
+---
+
+在这篇教程中，我们不会花时间在CSS上。如果你想让app看起来更漂亮，你可以随时添加自己的风格。
+
+或者，你可以采纳[this commit](https://github.com/teropa/redux-voting-client/commit/css)中的一些样式。除了
+CSS文件，它添加了Webpack支持包括([自动初始化](https://github.com/postcss/autoprefixer))它,并且稍微改进了结果
+可视化组件。
+
+<h3 id='Unit_Testing_support'> 支持单元测试</h3>
+
+我们同样打算对客户端程序编写一些单元测试。我们可以使用与服务器端相同的单元测试库—— Mocha和Chai ——来测试它：
+```
+npm install --save-deve mocha chai
+```
+
+我们还打算测试React组件，这将需要一个DOM。一种可选方案是使用karma库运行在实际的浏览器上。然而，我们实际上可以不这么
+做通过使用jsdom, 在node上运行的纯javascript DOM的实现。
+```
+npm install --save-dev jsdom
+```
+
+---
+
+最新版本的jsdom需要io.js或者node.js 4.0.0。如果你使用的是node旧版本，你需要准确的安装旧版本：
+```
+npm install --save-dev jsdom@3
+```
+
+---
+
+我们同样需要一些准备代码在它对react有效之前。我们其实需要建立jsdom版本的**document**和**window**对象，它们都是
+浏览器普遍提供的。然后我们需要将它们放在 **global object**中，当React访问 **document** 和 **window**时可以发现
+它们。我们可以为这种类型的setup code新建一个test helper文件:
+```
+// test/test_helper.js
+
+
+import jsdom from 'jsdom';
+
+const doc = jsdom.jsdom('<!doctype html><html><body></body></html>');
+const win = doc.defaultView;
+
+global.document = doc;
+global.window = win;
+```
+
+此外，我们需要获取jsdom窗口对象包含的所有属性，例如navigator，并将它们提升到Node.js全局对象。这样做可以使窗口提供的
+属性在没有**window.**前缀的情况下使用。React内部的一些代码依赖于它：
+```
+// test/test_helper.js
+
+import jsdom from 'jsdom';
+
+const doc = jsdom.jsdom('<!doctype html><html><body></body></html>');
+const win = doc.defaultView;
+
+global.document = doc;
+global.window = win;
+
+Object.keys(window).forEach((key) => {
+    if(!(key in global)) {
+        global[key] = window[key];
+    }
+});
+```
+
+我们同样打算使用Immutable集合，所以我们需要重复我们在服务器上使用的技巧来添加对它们对Chai expectation的支持。我们同时
+安装immutable和chai-immutable两个包：
+```
+npm install --save immutable
+npm install --save-dev chai-immutable
+```
+
+接下来我们在test helper文件中使它生效：
+```
+// test/test_helper.js
+
+import jsdom from 'jsdom';
+import chai from 'chai';
+import chaiImmutable from 'chai-immutable';
+
+const doc = jsdom.jsdom('<!doctype html><html><body></body></html>');
+const win = doc.defaultView;
+
+global.document = doc;
+global.window = win;
+
+Object.keys(window).forEach((key) => {
+    if(!(key in global)) {
+        global[key] = window[key];
+    }
+});
+
+chai.use(chaiImmutable);
+```
+
+在我们可以运行测试之前的最后一步是提出运行它们的命令，并将其放在我们的package.json中:
+```
+//package.json
+
+"script": {
+    "test": "mocha --compilers js:babel-core/register --require ./test/test_helper.js \"test/**/*@(.js|.jsx)\""
+}
+```
+
+这和我们服务器package.json中的命令几乎一致，它们唯一的区别在测试文件规范上：在服务器我们只使用 **--recursive**,但是该选项
+不会发现 **.jsx**文件。我们需要使用 **glob**, 它会找到所有的 **.js**和 **.jsx**测试文件。
+
+当代码变化时，连续运行测试是有用的。我们可以为此添加一个命令**test:watch**,它与服务器的命令是一样的：
+```
+// package.json
+
+"scripts": {
+    "test": "mocha --compilers js:babel-core/register --require ./test/test_helper.js 'test/**/*.@(js|jsx)'",
+    "test:watch": "npm run test -- --watch"
+  },
+```
