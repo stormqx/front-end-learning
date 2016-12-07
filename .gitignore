@@ -52,4 +52,5 @@ jspm_packages
 # Yarn Integrity file
 .yarn-integrity
 
-
+#webpack
+bundle.js
