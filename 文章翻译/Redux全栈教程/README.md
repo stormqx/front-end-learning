@@ -136,7 +136,7 @@ entry同样会被放在vote中。
 <h3 id='Project_Setup)'> 项目安装</h3>
 
 说了这么多废话，是时候开始干活了。在我们做任何事情之前，我们需要建立一个项目目录并且初始化它作为一个NPM项目：
-```
+```zsh
 mkdir voting-server
 cd voting-server
 npm init -y
@@ -145,24 +145,24 @@ npm init -y
 
 我们打算使用ES6语法来编写程序。虽然node从4.0.0版本支持很多ES6特性，但是它仍然不支持模块化(modules),而模块化正是我们想用的。我们需要向
 项目中添加babel, 这样我们能够随心所欲的使用ES6特性，babel会将代码转换成ES5:
-```
+```zsh
 npm install --save-dev babel-core babel-cli babel-preset-es2015
 ```
 因为我们将写一系列的单元测试，我们同样需要一些库来写它们：
-```
+```zsh
 npm install --save-dev  mocha chai
 ```
 [Mocha](https://mochajs.org/)是我们将要使用的测试框架，[Chai](http://chaijs.com/)是一个断言(assertion)/期望(expectation)库，我
 们在测试中使用它来指定我们期望发生的事情。
 
 我们可以使用node_modules下的mocha命令来运行测试。
-```
+```zsh
 ./node_modules/mocha/bin/mocha --compilers js: babel-core/register --recursive
 ```
 这条命令告诉Mocha递归的寻找项目中的所有测试并且运行它们。在运行前它先使用babel转化ES6代码。
 
 从长远来看，在我们的package.json中存储这条命令将会更容易：
-```
+```js
 //package.json
 "script": {
   "test": "Mocha --compilers js: babel-core/register --recursive"
@@ -171,7 +171,7 @@ npm install --save-dev  mocha chai
 我们需要做的另外一件事是使babel的ES6/ES2015语法支持功能生效。这可以通过激活我们已经安装过的**babel-preset-es2015**包来完成。我们只需
 要在package.json中添加babel部分：
 
-```
+```js
 //package.json
 "babel": {
   "preset": ["es2015"]
@@ -179,11 +179,11 @@ npm install --save-dev  mocha chai
 ```
 现在我们可以使用npm命令来运行测试。
 
-```
+```zsh
 npm run test
 ```
 **test:watch** 命令可以用来启动一个进程监控代码中的变化并且在每次变化后运行测试:
-```
+```js
 //package.json
 "script": {
   "test": "mocha --compolers js:babel-core/register recursive",
@@ -192,12 +192,12 @@ npm run test
 ```
 我们首先打算用的库是Facebook的immutable, 它可以为我们提供一些数据结构使用。我们将在下一个章节讨论immutable，现在我们仅仅将它加入到项
 目中来，同时安装的有chai-immutable库，它可以扩展Chai来支持比较Immutable数据结构(comparing Immutable data structures):
-```
+```zsh
 npm install --save immutable
 npm install --save-dev chai-immutable
 ```
 我们需要在任何测试运行前插入chai-immutable.我们可以在一个很小的test_heler文件中做到这一点，所以我们接下来应该创建它：
-```
+```js
 // test/test_helper.js
 
 import chai from 'chai';
@@ -206,7 +206,7 @@ import chaiImmutable from 'chai-immutable';
 chai.use(charImmutable);
 ```
 接下来我们需要在Mocha启动测试之前导入test_helper文件：
-```
+```js
 //package.json
 
 "script": {
@@ -257,7 +257,7 @@ Immutable data structures是我们建立应用程序state需要用的材料。�
 取而代之的是我们获得另外一个数字，它是将之前的数字加1后的结果。我们可以纯函数来实现。它的参数是当前的state并且它的返回值将作为下一个state
 被使用。下面是这个函数以及与它相关的单元测试：
 
-```
+```js
 // test/immutable_spec.js
 
 import {expect} from 'chai'
@@ -300,7 +300,7 @@ describe('immutability', ()=> {
 例如，一个应用程序的state是一系列的电影，我们可以使用Immutable的list。添加一部电影生成新的电影列表的操作是通过将旧的电影列表和新的电影
 相结合来完成的。至关重要的是，旧的电影列表在操作后仍然没有改变。
 
-```
+```js
 // test/immutable_spec1.js
 
 /**
@@ -345,7 +345,7 @@ describe('immutability', () => {
 这个想法扩展到整个state tree也是如此。一个state tree只是由Lists, Maps或者一些其他类型的集合嵌套形成的。在它上面进行操作相当于生成一颗
 新的state tree,并保留下来旧的state tree. 如果state tree是一个Map,里面有一个键'Movie'指向了一个电影列表，添加一部电影意味着我们需要
 新创建一个map,键'Movie'指向一个新的lis：
-```
+```js
 // test/immutable_spec2.js
 
 /**
@@ -399,7 +399,7 @@ describe('immutability', () => {
 
 对于如此类的嵌套数据结构的操作，immutable提供了几个帮助函数，可以更容易的"到达"嵌套数据结构来产生新的值。在
 这种情况下，我们可以使用update函数来使代码更加简洁：
-```
+```js
 // test/immutable_spec3.js
 
 fuction addMovie(currentState, movie) {
@@ -434,7 +434,7 @@ objects和数组可能会造成过量的复制，这会降低性能。
 
 首先，正如我们前面所讨论的，应用程序允许"加载"一系列想要被投票的条目。我们应该有一个**setEntries**函数，它可以获取之
 前的state和一系列条目，生成一个包括所有条目的state,下面是相关的测试代码：
-```
+```js
 /**
  * Created by qixin on 27/11/2016.
  */
@@ -463,7 +463,7 @@ describe('application logic', () => {
 **setEntries**的最初实现尽可能做最简单的事情：它可以在Map中设置一项键为'entries'，值为给定的一系列entries.这
 生成了我们之前设计的第一个state tree.
 
-```
+```js
 /**
  * Created by qixin on 27/11/2016.
  */
@@ -475,7 +475,7 @@ export function setEntries(state, entries) {
 
 为了方便，我们允许输入的条目是一个普通的js数组(或者是其他可迭代的集合)。当在state tree中，它仍然是一个immutable List。
 
-```
+```js
 // test/core.js
 
         it('converts to immutable', () =>{
@@ -488,7 +488,7 @@ export function setEntries(state, entries) {
         });
 ```
 在实现中，我们应该传递给定的entries给List构造器来满足这个需求：
-```
+```js
 /**
  * Created by qixin on 27/11/2016.
  */
@@ -509,7 +509,7 @@ export function setEntries(state, entries) {
 函数不需要额外的参数。在state中应该建立一个**vote** Map, 并且两个条目包含在键为pair的键值对中。处于投票阶段的条目不应
 该再出现在entries List中。
 
-```
+```js
 // test/core_spec1.js
 
 /**
@@ -546,7 +546,7 @@ describe('application logic', () => {
 ```
 实现这个操作将会[merge](https://facebook.github.io/immutable-js/docs/#/Map/merge)一个更新进old state,更新包括
 将头两个条目放到一个List中，其他在仍存放在新版的**entries**中：
-```
+```js
 // test/core.js
 
 import {List, Map} from 'immutable';
@@ -566,7 +566,7 @@ export function next(state) {
 
 当一个投票进行时，应该可以让人们对条目进行投票。当对一个条目进行新的投票时，它的"计数"（tally)也应该出现在投票中。如果一个
 条目已经有了计数，它应该被增加：
-```
+```js
 // test/core_spec3.js
 
 /**
@@ -640,7 +640,7 @@ describe('application logic', () => {
 ---
 
 我们可以下面的代码来通过这些测试：
-```
+```js
 // test/core.js
 
 export function vote(state, entry) {
@@ -657,7 +657,7 @@ export function vote(state, entry) {
 
 它包装了很多层(It packs a lot of punch)，但这正是让我们可以愉快得使用Immutable data structures的那类代码，因此花点
 时间来熟悉它是值得的。
-```
+```js
 updateIn()
 
 updateIn(keyPath: Array<any>, updater: (value: any) => any): Map<K, V>
@@ -682,7 +682,7 @@ updateIn(
 后来仍然可以被用来与其他条目配对pk。如果票数相同，两个条目都应该保存。
 
 我们在已经实现的**next**函数中添加这个逻辑：
-```
+```js
 /**
  * Created by qixin on 30/11/2016.
  */
@@ -742,7 +742,7 @@ describe("application logic", () => {
 
 ```
 在实现中，我们只是将当前投票的“获胜者”连接到entries后面.我们可以使用getWinners新功能找到这些赢家：
-```
+```js
 // src/core.js
 
 function getWinners(vote) {
@@ -769,7 +769,7 @@ export function next(state) {
 
 在某一时刻，当投票结束时将只剩下一个条目。这时我们将有一个获胜的entry.我们应该做的不是试图形成下一个
 投票，而是明确的在state中设置赢者。与此同时，投票结束了。
-```
+```js
 // test/core_spec5.js
 
 describe('next', () => {
@@ -796,7 +796,7 @@ describe('next', () => {
 });
 ```
 在**next**的实现中，我们应该有一个特殊条件来处理当entries的大小变为1的情况：
-```
+```js
 // src/core.js
 
 export function next(state) {
@@ -833,7 +833,7 @@ export function next(state) {
 Action是一种简单的数据结构，描述了应用程序中应该发生的变化。它基本上描述了一个包装成小对象的函数调用。按照惯例，
 每一个action都有type属性，它描述了动作的操作。Action也可能携带其他属性。下面是几个与我们的核心函数相匹配的样例
 Action。
-```
+```js
 {type: 'SET_ENTRIES', entries: ['Transplotting', '28 Days Later']}
 
 {type: 'NEXT' }
@@ -842,7 +842,7 @@ Action。
 ```
 如果actions使用这种写法，我们同样需要一种方式将它们转换成实际的核心函数调用。例如，对于**VOTE** action,应进行
 以下调用：
-```
+```js
 // this action
 let voteAction = {type: 'VOTE', entry: 'Transplotting'};
 // should cause this to happen
@@ -850,7 +850,7 @@ return vote(state, voteAction.entry);
 ```
 我们将要写的是能够根据当前state进行任何action的通用函数，并且能够调用与action相匹配的核心函数。这个函数被称为：
 reducer:
-```
+```js
 // src/reducer.js
 
 /**
@@ -862,7 +862,7 @@ export default function reducer(state, action) {
 ```
 
 我们应该测试reducer确实能够处理我们的三个action:
-```
+```js
 // test/reducer_spec.js
 
 /**
@@ -927,7 +927,7 @@ describe('reducer', () => {
 
 
 一个reducer应该根据action的类型委托相应的核心函数。它还知道如何从每个action对象中解压出每个函数的附加参数:
-```
+```js
 // src/reducer.js
 
 /**
@@ -952,7 +952,7 @@ export default function reducer(state, action) {
 
 Reducer另外一个重要的要求是如果它们以未定义的状态被调用时，它们知道如何将其初始化为有意义的值。在我们这种条件
 下，初始值是Map。因此，给定一个未定义状态就等于给定一个空的Map,同样是有效的。
-```
+```js
 // test/reducer_spec1.js
 
 /**
@@ -978,7 +978,7 @@ describe('reducer', () => {
 });
 ```
 因为我们应用程序的逻辑存放在**core.js**中，在这里引入初始state是有道理的：
-```
+```js
 // src/core.js
 
 export const INITIAL_STATE = Map();
@@ -986,7 +986,7 @@ export const INITIAL_STATE = Map();
 
 在reducer中，我们导入它，并且将它做为state参数的默认值：
 
-```
+```js
 /**
  * Created by qixin on 01/12/2016.
  */
@@ -1008,7 +1008,7 @@ export default function reducer(state = INITIAL_STATE, action) {
 关于这个reducer的工作方式有趣的是给定任何类型的action,它如何能够普遍的用于将应用程序的一个状态切换到
 下一个。给定一个历史state的集合，你实际上可以通过[reduce](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
 集合到当前state.这也是为什么函数被称为reducer: 它满足了reduce回调函数的约定。
-```
+```js
 // test/reducer_spec2.js
 
 /**
@@ -1062,7 +1062,7 @@ state的结构，它会变得很脆弱。如果你想改变state的形状，需�
 我们的应用程序太小了，所以没有这类问题，但是我们已经有了改进它的机会：**vote**函数是没有理由来接收应用程序
 整个state的，因为它仅仅对'vote'部分进行操作。它只需要知道这些东西就够了。我们可以修改已经写好的与**vote**
 相关的单元测试来实现这个想法：
-```
+```js
 // test/core_spec3.js
 
 /**
@@ -1119,7 +1119,7 @@ describe('application logic', () => {
 正如我们所看到这，这么做同时简化了测试代码，这通常是个好预兆！
 
 **vote**函数实现部分现在只需要接收state中的vote部分，然后更新它的票数：
-```
+```js
 export function vote(voteState, entry) {
     return voteState.updateIn(
         ['tally', entry],
@@ -1129,7 +1129,7 @@ export function vote(voteState, entry) {
 }
 ```
 现在，选取与**vote**函数相关的一部分state变成了reducer的部分工作：
-```
+```js
 // src/reducer.js
 
 export default function reducer(state = INITIAL_STATE, action) {
@@ -1163,7 +1163,7 @@ export default function reducer(state = INITIAL_STATE, action) {
 为了应对这种实际情况，我们可以使用Redux Store。正如名字所蕴含的一样，它是存储随着时间推移你的应用程序state的对象。
 
 Redux Store用一个reducer函数进行初始化，例如我们已经实现的：
-```
+```js
 
 import {createStore} from 'redux';
 
@@ -1172,19 +1172,19 @@ const store = createStore(reducer);
 
 接下来你可以做的是分发(dispatch) actions到store中。Store将在内部使用你的reducer, 并将actions作用于当前state,然后
 存储并生成下一状态：
-```
+```js
 
 store.dispatch({type: 'NEXT'});
 ```
 
 在任何时间点，你都可以从store内部获得当前的state:
-```
+```js
 store.getState();
 ```
 
 我们将要建立并导出Redux Store到一个名为store.js的文件中。让我们首先测试它。我们可以通过它建立一个store, 读取它的初始state,
 分发action，并且看到已经改变的state:
-```
+```js
 /**
  * Created by qixin on 04/12/2016.
  */
@@ -1216,12 +1216,12 @@ describe('store', () => {
 
 ```
 在创建Store之前，我们需要将redux加入工程中:
-```
+```zsh
 
 npm install --save redux
 ```
 接下来我们可以创建store.js文件，它只是简单了调用了createStore函数和之前的reducer.
-```
+```js
 // src/store.js
 
 
@@ -1253,7 +1253,7 @@ export default function makeStore() {
 知道reducer。其他都是与我们自身相关的，与框架无关的，高度可移植和纯函数代码！
 
 如果我们现在为应用程序创建入口index.js, 我们可以让它创建和导出store:
-```
+```js
 // index.js
 
 import makeStore from './src/store';
@@ -1274,13 +1274,13 @@ export const store = makeStore();
 客户端提供了多种回退机制。
 
 让我们在项目中添加Socket.i：
-```
+```zsh
 
 npm install --save socket.io
 ```
 
 接下来，我们新建一个server.js文件，它导出一个创建socket.io服务器的函数。
-```
+```js
 import Server from 'socket.io';
 
 export default function startServer() {
@@ -1291,7 +1291,7 @@ export default function startServer() {
 需要匹配端口号。
 
 我们可以让index.js调用这个函数，因此当app启动时服务器同时被启动：
-```
+```js
 // index.js
 
 import creatStore from './src/store';
@@ -1301,7 +1301,7 @@ export const store = makeStore();
 startServer();
 ```
 如果我们在package.json文件中添加了start命令，我们让启动环节变得更简单一些：
-```
+```js
 
 "script": {
     "start": "babel-node index.js",
@@ -1311,7 +1311,7 @@ startServer();
 ```
 
 现在我们可以通过敲入下列命令简单的开启服务器(并创建Redux store：
-```
+```zsh
 npm run start
 ```
 
@@ -1334,7 +1334,7 @@ npm run start
 变的回调(callback).
 
 我们将在startServer中实现这个，因此让我们首先给它Redux store:
-```
+```js
 // index.js
 
 import makeStore from './src/store';
@@ -1347,7 +1347,7 @@ startServer(store);
 
 我们接下来要做的是向store subscribe一个监听器,这个store可以读取current state, 将其转化为普通javascript对象，将其
 作为socket.io服务器上的state action。结果是一个json序列化的状态快照通过所有活动的socket.io连接发送。
-```
+```js
 import Server from 'socket.io';
 
 
@@ -1372,7 +1372,7 @@ store.subscribe(
 
 我们可以在socket.io服务器上监听'connection'事件。每次客户端连接时都会获得一个。在事件监听器中，我们可以立即发送current
 state:
-```
+```js
 import Server from 'socket.io';
 
 
@@ -1394,7 +1394,7 @@ io.on('connection', (socket) => {
 比赛。
 
 我们使用的解决方法其实非常简单。我们做的只是让客户端发出 'action' event直接进入到Redux Store中：
-```
+```js
 // src/server.js
 
 import Server from 'socket.io';
@@ -1437,7 +1437,7 @@ io.on('connection', (socket) => {
 
 在我们完成服务器之前，让我们为它加载一些测试条目，以便我们可以在整个系统运行时查看。我们可以添加**entries.json**文件列举出
 比赛条目。例如，Danny Boyle到目前为止的电影列表，随时替换您最喜欢的主题。
-```
+```json
 // entries.json
 
 [
@@ -1456,7 +1456,7 @@ io.on('connection', (socket) => {
 ```
 
 我们可以将它加载到index.js文件中，然后通过调度**NEXT** action来开启投票。
-```
+```js
 // index.js
 
 import makeStore from './src/store';
@@ -1498,7 +1498,7 @@ Redux自身是如何工作的，很快我们会详细的了解到Redux如何适�
 ---
 
 首先我们需要做的是新建一个npm项目，和我们对服务器的做法类似。
-```
+```zsh
 
 mkdir voting-client
 cd voting-client
@@ -1508,7 +1508,7 @@ npm init -y
 
 我们的应用程序需要一个主页，让我们把它放在**dist/index.html**:
 
-```
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1525,28 +1525,28 @@ npm init -y
 该页面包含一个id为app的<div>，我们将把应用程序放在这里。同时期望在同一目录下有一个名为bundle.js的javascript文件。
 
 让我们为这个应用程序也创建第一个js文件.这将是应用程序的入口文件。现在我们就简单的放入一个logging statement:
-```
+```js
 // src/index.js
 
 console.log('I`m alive');
 ```
 
 为了简化客户端开发工作流，我们将使用[Webpack](http://webpack.github.io/)及其开发服务器,让我们在项目中添加它们:
-```
+```zsh
 npm install --save-dev webpack webpack-dev-server
 ```
 
 ---
 
 如果你之前没有安装它们，也要在全局安装相同的包，这样你就可以从命令行方便的启动它们：
-```
+```zsh
 npm install -g webpack webpack-dev-server
 ```
 
 ---
 
 接下来，在项目的根目录下添加一个Webpack配置文件，让它与我们已经创建的文件和目录匹配起来：
-```
+```js
 // webpack.config.js
 
 module.export ={
@@ -1568,23 +1568,23 @@ module.export ={
 基础。
 
 现在你应该可以运行Webpack生成**bundle.js**:
-```
+```zsh
 webpack
 ```
 
 现在你同样可以启动开发服务，之后测试网页(包括**index.js**中的logging statement)都可以在localhost:8080访问到。
-```
+```zsh
 webpack-dev-server
 ```
 
 因为我们打算在客户端程序中使用ES6和React的JSX语法，我们需要一些相关工具。Babel知道如何处理它们，所以让我们添加它。
 我们需要Babel和它的Webpack loader.
-```
+```zsh
 npm install --save-dev babel-core babel-loader babel-preset-es2015 babel-preset-react
 ```
 
 在**package.json**文件中，我们需要使Babel支持 ES6/ES2015 和 React JSX，可以通过激活我们已经安装的presets:
-```
+```json
 // package.json
 
 "babel": {
@@ -1593,7 +1593,7 @@ npm install --save-dev babel-core babel-loader babel-preset-es2015 babel-preset-
 ```
 
 在webpack config文件中我们需要作出变化让Webpack可以沿着 **.js** 文件找到 **.jsx**文件,并且都通过Babel进行处理:
-```
+```js
 //webpack.config.js
 
 module.exports ={
@@ -1631,20 +1631,20 @@ CSS文件，它添加了Webpack支持包括([自动初始化](https://github.com
 <h3 id='Unit_Testing_support'> 支持单元测试</h3>
 
 我们同样打算对客户端程序编写一些单元测试。我们可以使用与服务器端相同的单元测试库—— Mocha和Chai ——来测试它：
-```
+```zsh
 npm install --save-deve mocha chai
 ```
 
 我们还打算测试React组件，这将需要一个DOM。一种可选方案是使用karma库运行在实际的浏览器上。然而，我们实际上可以不这么
 做通过使用jsdom, 在node上运行的纯javascript DOM的实现。
-```
+```zsh
 npm install --save-dev jsdom
 ```
 
 ---
 
 最新版本的jsdom需要io.js或者node.js 4.0.0。如果你使用的是node旧版本，你需要准确的安装旧版本：
-```
+```zsh
 npm install --save-dev jsdom@3
 ```
 
@@ -1653,7 +1653,7 @@ npm install --save-dev jsdom@3
 我们同样需要一些准备代码在它对react有效之前。我们其实需要建立jsdom版本的**document**和**window**对象，它们都是
 浏览器普遍提供的。然后我们需要将它们放在 **global object**中，当React访问 **document** 和 **window**时可以发现
 它们。我们可以为这种类型的setup code新建一个test helper文件:
-```
+```js
 // test/test_helper.js
 
 
@@ -1668,7 +1668,7 @@ global.window = win;
 
 此外，我们需要获取jsdom窗口对象包含的所有属性，例如navigator，并将它们提升到Node.js全局对象。这样做可以使窗口提供的
 属性在没有**window.**前缀的情况下使用。React内部的一些代码依赖于它：
-```
+```js
 // test/test_helper.js
 
 import jsdom from 'jsdom';
@@ -1688,13 +1688,13 @@ Object.keys(window).forEach((key) => {
 
 我们同样打算使用Immutable集合，所以我们需要重复我们在服务器上使用的技巧来添加对它们对Chai expectation的支持。我们同时
 安装immutable和chai-immutable两个包：
-```
+```zsh
 npm install --save immutable
 npm install --save-dev chai-immutable
 ```
 
 接下来我们在test helper文件中使它生效：
-```
+```js
 // test/test_helper.js
 
 import jsdom from 'jsdom';
@@ -1717,7 +1717,7 @@ chai.use(chaiImmutable);
 ```
 
 在我们可以运行测试之前的最后一步是提出运行它们的命令，并将其放在我们的package.json中:
-```
+```json
 //package.json
 
 "script": {
@@ -1729,7 +1729,7 @@ chai.use(chaiImmutable);
 不会发现 **.jsx**文件。我们需要使用 **glob**, 它会找到所有的 **.js**和 **.jsx**测试文件。
 
 当代码变化时，连续运行测试是有用的。我们可以为此添加一个命令**test:watch**,它与服务器的命令是一样的：
-```
+```json
 // package.json
 
 "scripts": {
@@ -1756,18 +1756,18 @@ chai.use(chaiImmutable);
 我们测试纯应用程序逻辑一样容易。
 
 但是，首先，让我们向工程中先添加react：
-```
+```zsh
 npm install --save react react-dom
 ```
 
 我们也应该安装[react-hot-loader](https://github.com/gaearon/react-hot-loader)。它将为我们重新加载代码，并且不会丢失当前
 state,这样可以加快我们的开发流程。
-```
+```zsh
 npm install --save-dev react-hot-loader
 ```
 
 我们需要修改我们的**webpack.config.js**文件来使hot-loader生效。下面使升级后的版本：
-```
+```js
 // webpack.config.js
 
 module.exports ={
@@ -1822,7 +1822,7 @@ react-hot-loader提供了一种比单元测试更严格的[feedback loop](https:
 
 我们假设有一个**voting**组件，并且在应用程序的入口渲染它。我们可以把它挂载到我们前面写的index.html中的#app DIV中，我们也应该
 重命名index.js为index.jsx, 因为它现在包含了一些jsx语法。
-```
+```js
 
 // src/index.jsx
 
@@ -1853,7 +1853,7 @@ entry: [
 ```
 
 如果你启动或者重启webpack dev server, 它将会报错：missing Voting component。让我们先写第一版来修复这个问题：
-```
+```js
 // src/components/Voting.jsx
 
 import React from 'react';
@@ -1899,14 +1899,14 @@ export default class Button extends React.Component {
 ```
 
 这会将条目渲染成一对按钮。你应该可以在浏览器中看到它们。
-```
+```zsh
 webpack-dev-server --hot --inline
 ```
 
 试着改变组件中的代码，你会看到它是如何立即应用于浏览器的。不需要重启，不需要页面重加载。是更快速的反馈！
 
 现在我们也可以为我们的功能添加第一个单元测试，它被放在voting_spec.jsx中：
-```
+```js
 // test/components/Voting_spec.jsx
 
 import Voting from '../../src/components/Voting';
@@ -1919,13 +1919,13 @@ describe('Voting', () => {
 为了测试组件基于**pair**属性渲染这些按钮，我们应该渲染它然后查看输出结果。为了在单元测试中渲染组件，我们可以使用
 [renderIntoDocument](https://facebook.github.io/react/docs/test-utils.html#renderintodocument)帮助函数。
 它包含在我们将要安装的React test utilities package。
-```
+```zsh
 npm install --save react-addons-test-utils
 ```
 
 ------
 
-```
+```js
 // test/components/Voting_spec.jsx
 
 import Voting  from '../../src/components/Voting';
@@ -1948,7 +1948,7 @@ describe('Voting', () => {
 
 一旦组件成功渲染，我们可以使用另外一个帮助函数[scryRenderedDOMComponentsWithTag](https://facebook.github.io/react/docs/test-utils.html#scryrendereddomcomponentswithtag)
 来找到我们期望中的 **button** 元素。我们期望得到两个按钮，并且按钮的内容分别对应两个条目。
-```
+```js
 // test/Voting_spec.jsx
 
 import Voting  from '../../src/components/Voting';
@@ -1979,7 +1979,7 @@ describe('Voting', () => {
 ```
 
 如果现在你运行测试，你应该看到它通过了测试：
-```
+```zsh
 npm run test
 ```
 
@@ -1988,7 +1988,7 @@ npm run test
 让我们更进一步为它添加单元测试。我们可以使用React`s test utilities中的[Situmate](https://facebook.github.io/react/docs/test-utils.html#simulate)
 对象模拟一次点击。
 
-```
+```js
 // test/components/Voting_spec.jsx
 
 describe('Voting', () => {
