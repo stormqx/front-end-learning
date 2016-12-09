@@ -37,8 +37,8 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
 * [客户端应用程序](#The_Client_Application)
   * [客户端项目安装](#Client_Project_Setup)
     * [支持单元测试](#Unit_Testing_support)
-  * React 以及 React热加载(react-hot-loader)
-  * 编写投票界面UI
+  * [React 以及 React热加载](#React_and_react-hot-loader)
+  * [编写投票界面UI](#Writing_The_UI_for_The_Voting_Screen)
   * 编写投票结果界面UI以及处理路由
   * react从Redux获得数据
   * 安装Socket.io客户端
@@ -1737,3 +1737,504 @@ chai.use(chaiImmutable);
     "test:watch": "npm run test -- --watch"
   },
 ```
+
+<h3 id='React_and_react-hot-loader'> React 以及 React热加载</h3>
+
+有了Webpack和Babel这些基础设施，我们来谈谈React!
+
+真正cool的事情是使用Redux和Immutable构建React应用的方法是我们可以写一些"纯组件"（有时被称为Dumb component)。在概念上，它
+与纯函数非常相似，它要遵守一些规则：
+
+1. 纯组件接收所有的数据作为props, 好比函数接收所有的数据作为arguments。它应该没有副作用，包括从其他地方读取数据，启动网络请求
+等等。
+
+2. 纯组件通常没有内部state。它所渲染的内容完全取决于输入的props。使用相同的props渲染同一个纯组件应该总返回相同的结果。在组件
+内部没有隐藏state会造成两次渲染的UI不同。
+
+这与使用纯函数具有相同的[简化效果](https://www.youtube.com/watch?v=1uRC3hmKQnM&feature=youtu.be&t=13m10s): 我们可以
+可以通过观察组件的输入和它所渲染的东西来确定组件的用途。我们不需要了解其他的关于该组件的知识。同时测试也会变得非常容易——几乎和
+我们测试纯应用程序逻辑一样容易。
+
+但是，首先，让我们向工程中先添加react：
+```
+npm install --save react react-dom
+```
+
+我们也应该安装[react-hot-loader](https://github.com/gaearon/react-hot-loader)。它将为我们重新加载代码，并且不会丢失当前
+state,这样可以加快我们的开发流程。
+```
+npm install --save-dev react-hot-loader
+```
+
+我们需要修改我们的**webpack.config.js**文件来使hot-loader生效。下面使升级后的版本：
+```
+// webpack.config.js
+
+module.exports ={
+
+    entry: [
+        'webpack-dev-server/client?http://localhost:8080',
+        'webpack/hot/only-dev-server',
+        './src/index.js'
+    ],
+    module: {
+        loaders:[{
+            test: /\.jsx?$/,
+            exclude: /node_modules/,
+            loader: 'react-hot!babel'
+        }]
+    },
+    resolve: {
+        extensions: ['', '.js', '.jsx']
+    },
+    output: {
+        path: __dirname + '/dist',
+        publicPath: '/',
+        filename: 'bundle.js'
+    },
+    devServer: {
+        contentBase: './dist',
+        hot: true
+    },
+    pludges: [
+        new webpack.HotModuleReplacementPlugin()
+    ]
+};
+```
+
+在entry部分我们在应用程序的入口处添加了两个新东西：Webpack开发服务器的客户端库和Webpack热加载模块。这些为
+[hot module replacement](https://github.com/webpack/docs/wiki/hot-module-replacement-with-webpack)提供了
+webpack基础。hot module replacement不是默认加载的。因此我们还需要在**plugins**部分加载其插件，这样可以在**devServer**
+部分使用它。
+
+在**loaders**部分，我们配置react-hot和babel来支持.js和.jsx文件。
+
+如果你现在启动或者重启开发服务器，你将会在控制台看到Hot Module Replacement成功启动。下面我们要编写第一个组件：
+
+<h3 id='Writing_The_UI_for_The_Voting_Screen'> 编写投票界面UI</h3>
+
+应用程序的投票界面非常简单：当投票进行时，它总是有两个按钮 —— 条目中其中一个将被投票。当投票结束时，它将显示胜者。
+![voting_shots.png](image/voting_shots.png)
+
+到目前为止，我们一直主要进行测试驱动开发，但到了react组件，我们将改变工作流程：先写组件然后再测试。这是因为Webpack和
+react-hot-loader提供了一种比单元测试更严格的[feedback loop](https://blog.iterate.no/2012/10/01/know-your-feedback-loop-why-and-how-to-optimize-it/)
+此外，在编写UI界面时没有一种方法比实际看到有更好的反馈。
+
+我们假设有一个**voting**组件，并且在应用程序的入口渲染它。我们可以把它挂载到我们前面写的index.html中的#app DIV中，我们也应该
+重命名index.js为index.jsx, 因为它现在包含了一些jsx语法。
+```
+
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import Voting from './components/Voting';
+
+const pair = ['Trainspotting', '28 Days Later'];
+
+ReactDOM.render(
+  <Voting pair={pair} />,
+  document.getElementById('app')
+);
+```
+
+Voting部件将当前正被投票的条目作为props.现在我们只需要用假数据，之后我们会用真实数据来代替它。组件本身是纯的，所以并不用担心
+数据来自哪里。
+
+同时别忘了，在webpack.config.js中的入口文件名也需要修改：
+```js
+// webpack.config.js
+
+entry: [
+  'webpack-dev-server/client?http://localhost:8080',
+  'webpack/hot/only-dev-server',
+  './src/index.jsx'
+],
+```
+
+如果你启动或者重启webpack dev server, 它将会报错：missing Voting component。让我们先写第一版来修复这个问题：
+```
+// src/components/Voting.jsx
+
+import React from 'react';
+import Button from './Button';
+
+export default class Voting extends React.Component {
+    constructor(props) {
+        super(props);
+    }
+
+    getPair() {
+        return this.props.pair;
+    }
+
+    render() {
+        return (
+            <div className="voting">
+                {this.getPair().map((entry, index) =>
+                    <Button key={index} entry={entry} />
+                )}
+            </div>
+        );
+    }
+}
+
+
+// src/components/Button.jsx
+
+import React from 'react';
+
+export default class Button extends React.Component {
+    constructor(props) {
+        super(props);
+    }
+
+
+    render() {
+        return (
+          <button>{this.props.entry}</button>
+        );
+    }
+}
+```
+
+这会将条目渲染成一对按钮。你应该可以在浏览器中看到它们。
+```
+webpack-dev-server --hot --inline
+```
+
+试着改变组件中的代码，你会看到它是如何立即应用于浏览器的。不需要重启，不需要页面重加载。是更快速的反馈！
+
+现在我们也可以为我们的功能添加第一个单元测试，它被放在voting_spec.jsx中：
+```
+// test/components/Voting_spec.jsx
+
+import Voting from '../../src/components/Voting';
+
+describe('Voting', () => {
+
+});
+```
+
+为了测试组件基于**pair**属性渲染这些按钮，我们应该渲染它然后查看输出结果。为了在单元测试中渲染组件，我们可以使用
+[renderIntoDocument](https://facebook.github.io/react/docs/test-utils.html#renderintodocument)帮助函数。
+它包含在我们将要安装的React test utilities package。
+```
+npm install --save react-addons-test-utils
+```
+
+------
+
+```
+// test/components/Voting_spec.jsx
+
+import Voting  from '../../src/components/Voting';
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {
+    renderIntoDocument
+} from 'react-addons-test-utils';
+
+
+describe('Voting', () => {
+
+    it('renders a pair of buttons', () => {
+        const component = renderIntoDocument(
+          <Voting pair={["Trainspotting", "28 Days Later"]}/>
+        );
+    })
+});
+```
+
+一旦组件成功渲染，我们可以使用另外一个帮助函数[scryRenderedDOMComponentsWithTag](https://facebook.github.io/react/docs/test-utils.html#scryrendereddomcomponentswithtag)
+来找到我们期望中的 **button** 元素。我们期望得到两个按钮，并且按钮的内容分别对应两个条目。
+```
+// test/Voting_spec.jsx
+
+import Voting  from '../../src/components/Voting';
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {
+    renderIntoDocument,
+    scryRenderedDOMComponentsWithTag
+} from 'react-addons-test-utils';
+import {expect} from 'chai';
+
+
+describe('Voting', () => {
+
+    it('renders a pair of buttons', () => {
+        const component = renderIntoDocument(
+          <Voting pair={["Trainspotting", "28 Days Later"]}/>
+        );
+
+        const buttons = scryRenderedDOMComponentsWithTag(component, 'button')
+
+        expect(buttons.length).to.equal(2);
+        expect(buttons[0].textContent).to.equal("Trainspotting");
+        expect(buttons[1].textContent).to.equal("28 Days Later");
+    })
+
+});
+```
+
+如果现在你运行测试，你应该看到它通过了测试：
+```
+npm run test
+```
+
+当这些按钮中的一个被点击，组件应该invoke一个回调函数。和条目对一样，会掉函数也应该作为props传递给组件。
+
+让我们更进一步为它添加单元测试。我们可以使用React`s test utilities中的[Situmate](https://facebook.github.io/react/docs/test-utils.html#simulate)
+对象模拟一次点击。
+
+```
+// test/components/Voting_spec.jsx
+
+describe('Voting', () => {
+
+  //..
+
+    it('invokes callback when a button is clicked', () => {
+        let votedWith;
+        const vote = (entry) => votedWith = entry;
+
+        const component = renderIntoDocument(
+            <Voting pair={["Trainspotting", "28 Days Later"]}
+                    vote={vote}/>
+        );
+        const buttons = scryRenderedDOMComponentsWithTag(component, 'button');
+        Simulate.click(buttons[0]);
+
+        expect(votedWith).to.equal('Trainspotting');
+    })
+
+});
+```
+
+让这个测试通过很简单。我们只需要使用button的 **onClick**处理程序，使用正确的条目invoke **vote**。
+```js
+// src/components/Voting.jsx
+
+import React from 'react';
+
+export default React.createClass({
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  render: function() {
+    return <div className="voting">
+      {this.getPair().map(entry =>
+        <button key={entry}
+                onClick={() => this.props.vote(entry)}>
+          <h1>{entry}</h1>
+        </button>
+      )}
+    </div>;
+  }
+});
+```
+
+这是我们使用纯函数管理用户输入和actions的常用做法：组件本身不会做很多这类actions。它们只是调用props中的回调函数。
+
+一旦用户在一对条目中投完票，我们就不能让他们再次投票。虽然我们能够在组件state中内部处理它，为了努力保证我们的组件pure,
+因此我们应该试着外部化这个逻辑。组件会接收一个 **hasVoted**属性，现在我们使用假数据模拟。
+```js
+import React from 'react';
+import ReactDOM from 'react-dom';
+import Voting from './components/Voting';
+
+const pair = ['Trainspotting', '28 Days Later'];
+
+ReactDOM.render(
+    <Voting pair = {pair} hasVoted="Trainspotting" />,
+    document.getElementById('app')
+);
+```
+
+我们可以很轻易的完成这个功能：
+```js
+// src/components/Voting.jsx
+
+import React from 'react';
+
+export default React.createClass({
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  isDisabled: function() {
+    return !!this.props.hasVoted;
+  },
+  render: function() {
+    return <div className="voting">
+      {this.getPair().map(entry =>
+        <button key={entry}
+                disabled={this.isDisabled()}
+                onClick={() => this.props.vote(entry)}>
+          <h1>{entry}</h1>
+        </button>
+      )}
+    </div>;
+  }
+});
+```
+
+我们还要给用户投票的按钮添加一个小标签，以便它们清楚发生了什么。对于条目与 **hasVoted** props匹配的按钮，该
+标签应该可见。我们可以增加一个新的帮助函数 **hasVotedFor** 来确定是否渲染该标签。
+```js
+src/components/Voting.jsx
+
+import React from 'react';
+
+export default React.createClass({
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  isDisabled: function() {
+    return !!this.props.hasVoted;
+  },
+  hasVotedFor: function(entry) {
+    return this.props.hasVoted === entry;
+  },
+  render: function() {
+    return <div className="voting">
+      {this.getPair().map(entry =>
+        <button key={entry}
+                disabled={this.isDisabled()}
+                onClick={() => this.props.vote(entry)}>
+          <h1>{entry}</h1>
+          {this.hasVotedFor(entry) ?
+            <div className="label">Voted</div> :
+            null}
+        </button>
+      )}
+    </div>;
+  }
+});
+```
+投票界面最后需要的是如果出现了胜者，它应该替换掉已经渲染的投票按钮，并且立即显示出来。这里或许应该有另外一个winner props.
+再一次，我们在真实数据插入前可以临时用假数据来代替。
+```js
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import Voting from './components/Voting';
+
+const pair = ['Trainspotting', '28 Days Later'];
+
+ReactDOM.render(
+  <Voting pair={pair} winner="Trainspotting" />,
+  document.getElementById('app')
+);
+```
+
+我们可以有选择的渲染赢者dic还是按钮来解决这个问题。
+```js
+// src/components/Voting.jsx
+
+import React from 'react';
+
+export default React.createClass({
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  isDisabled: function() {
+    return !!this.props.hasVoted;
+  },
+  hasVotedFor: function(entry) {
+    return this.props.hasVoted === entry;
+  },
+  render: function() {
+    return <div className="voting">
+      {this.props.winner ?
+        <div ref="winner">Winner is {this.props.winner}!</div> :
+        this.getPair().map(entry =>
+          <button key={entry}
+                  disabled={this.isDisabled()}
+                  onClick={() => this.props.vote(entry)}>
+            <h1>{entry}</h1>
+            {this.hasVotedFor(entry) ?
+              <div className="label">Voted</div> :
+              null}
+          </button>
+        )}
+    </div>;
+  }
+});
+```
+
+这是我们所需要的功能，但是渲染代码还很凌乱。如果我们从中提取一些单独的组件，以便投票屏幕组件呈现Winner组件
+或者Vote组件。现在开始编写Winner组件，其实它只是一个div:
+```js
+src/components/Winner.jsx
+import React from 'react';
+
+export default React.createClass({
+  render: function() {
+    return <div className="winner">
+      Winner is {this.props.winner}!
+    </div>;
+  }
+});
+```
+
+现在Voting组件仅仅决定需要渲染哪个组件：
+```js
+src/components/Voting.jsx
+
+import React from 'react';
+import Winner from './Winner';
+import Vote from './Vote';
+
+export default React.createClass({
+  render: function() {
+    return <div>
+      {this.props.winner ?
+        <Winner ref="winner" winner={this.props.winner} /> :
+        <Vote {...this.props} />}
+    </div>;
+  }
+});
+```
+
+注意我们对Winner组件添加了[ref](https://facebook.github.io/react/docs/more-about-refs.html)。有时在
+单元测试中我们要使用它来抓取相关DOM节点。
+
+这是我们的纯Voting组件！注意我们还没有真正的实现任何逻辑：虽然有一些按钮，但是我们并没有指定它们具体怎么做，除了
+invoke回调。我们的组件仅仅关注于UI界面渲染。当我们将UI和Redux store连接在一起时，应用程序逻辑将在后面介绍。
+
+在我们继续编写代码前，我们需要先为我们添加的新功能写单元测试。首先，hasVoted props的出现应该导致投票按钮变为
+禁用。
+```js
+// test/components/Voting_spec.jsx
+
+it('disables buttons when user has voted', () => {
+  const component = renderIntoDocument(
+    <Voting pair={["Trainspotting", "28 Days Later"]}
+            hasVoted="Trainspotting" />
+  );
+  const buttons = scryRenderedDOMComponentsWithTag(component, 'button');
+
+  expect(buttons.length).to.equal(2);
+  expect(buttons[0].hasAttribute('disabled')).to.equal(true);
+  expect(buttons[1].hasAttribute('disabled')).to.equal(true);
+});
+```
+
+**vote**标签应该出现在条目与**hasVoted** props相匹配的按钮上。
+```js
+// test/components/Voting_spec.jsx
+
+it('adds label to the voted entry', () => {
+  const component = renderIntoDocument(
+    <Voting pair={["Trainspotting", "28 Days Later"]}
+            hasVoted="Trainspotting" />
+  );
+  const buttons = scryRenderedDOMComponentsWithTag(component, 'button');
+
+  expect(buttons[0].textContent).to.contain('Voted');
+});
+```
+
+当出现winner属性，应该不渲染按钮，取而代之的是winner元素。
