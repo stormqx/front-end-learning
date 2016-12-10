@@ -39,7 +39,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
     * [支持单元测试](#Unit_Testing_support)
   * [React 以及 React热加载](#React_and_react-hot-loader)
   * [编写投票界面UI](#Writing_The_UI_for_The_Voting_Screen)
-  * 编写投票结果界面UI以及处理路由
+  * [编写投票结果界面UI以及处理路由](#Writing_The_UI_for_The_Results_Screen_And_Handling_Routing)
   * react从Redux获得数据
   * 安装Socket.io客户端
   * 从服务端接收Actions
@@ -2238,3 +2238,517 @@ it('adds label to the voted entry', () => {
 ```
 
 当出现winner属性，应该不渲染按钮，取而代之的是winner元素。
+```js
+//test/components/Voting_spec.jsx
+
+it('renders just the winner when there is one', () => {
+  const component = renderIntoDocument(
+    <Voting winner="Trainspotting" />
+  );
+  const buttons = scryRenderedDOMComponentsWithTag(component, 'button');
+  expect(buttons.length).to.equal(0);
+
+  const winner = ReactDOM.findDOMNode(component.refs.winner);
+  expect(winner).to.be.ok;
+  expect(winner.textContent).to.contain('Trainspotting');
+});
+```
+
+<h3> 不可变数据和纯渲染</h3>
+
+我们之前已经讨论了不可变数据的优点，但是当我们把它和React结合起来使用另外会有一个好处：如果我们的组件
+属性只使用不可变数据，作为纯组件来编写它，我们可以让React使用一种更有效的策略来检测属性的变化。
+
+这是通过使用[add-on package](https://www.npmjs.com/package/react-addons-pure-render-mixin)中的
+[pureRenderMixin](https://facebook.github.io/react/docs/pure-render-mixin.html)实现的。当这个
+mixin被添加到组件中，它改变了React检查组件props(or states)变化的方式。它并不是深层次的比较，只是浅比较
+(shouldComponentUpdate skips updates for the whole component subtree. Make sure all the children
+components are also "pure".)这种方式将快得多。
+ 
+我们可以这样做的原因是，根据定义，在不可变数据的内部绝对不可能发生变化。如果一个组件的所有props全是不可变数据，
+如果在两次渲染中组件props保持相同的值，就没有必要再次渲染，完全可以跳过它。
+
+我们可以通过编写一些单元测试具体的了解它。我们的组件应该是纯的，所以我们如果给它一个可变数组，然后在数组中发生
+变化。它不应该被重新渲染：
+```js
+// test/components/Voting_spec.jsx
+
+  it('renders as a pure component', () => {
+       const pair = ['Trainspotting', '28 Days Later'];
+       const container = document.createElement('div');
+       let component = ReactDOM.render(
+           <Voting pair={pair}/>,
+           container
+       );
+       let firstButton = scryRenderedDOMComponentsWithTag(component, 'button')[0];
+       expect(firstButton.textContent).to.equal('Trainspotting');
+
+       
+       pair[0] = 'Sunshine';
+       component = ReactDOM.render(
+            <Voting pair={pair} />,
+            container
+       );
+       firstButton = scryRenderedDOMComponentsWithTag(component, 'button')[0];
+       expect(firstButton.textContent).to.equal('Trainspotting');
+    });
+```
+
+---
+
+没有使用 **renderIntoDocument**,我们通过手动构建父节点<div>,并且渲染它两次，这样我们可以操纵再渲染(re-rendering)
+
+---
+
+我们在props中明确的设置一个新的immutable list, 让变化反映到UI界面中：
+```js
+// test/components/Voting_spec.jsx
+
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {
+  renderIntoDocument,
+  scryRenderedDOMComponentsWithTag,
+  Simulate
+} from 'react-addons-test-utils';
+import {List} from 'immutable';
+import Voting from '../../src/components/Voting';
+import {expect} from 'chai';
+
+describe('Voting', () => {
+
+  // ...
+
+  it('does update DOM when prop changes', () => {
+    const pair = List.of('Trainspotting', '28 Days Later');
+    const container = document.createElement('div');
+    let component = ReactDOM.render(
+      <Voting pair={pair} />,
+      container
+    );
+
+    let firstButton = scryRenderedDOMComponentsWithTag(component, 'button')[0];
+    expect(firstButton.textContent).to.equal('Trainspotting');
+
+    const newPair = pair.set(0, 'Sunshine');
+    component = ReactDOM.render(
+      <Voting pair={newPair} />,
+      container
+    );
+    firstButton = scryRenderedDOMComponentsWithTag(component, 'button')[0];
+    expect(firstButton.textContent).to.equal('Sunshine');
+  });
+
+});
+```
+
+此时运行测试所显示的结果和我们预期中的不同：它在两种情况下都更新了UI，这意味着它深入检查了
+props,这是我们使用不可变数据想要避免的。
+
+当我们在组件中启用pure render mixin时，一切都会到位。我们需要先安装它的包：
+```zsh
+npm install --save react-addons-pure-render-mixin
+```
+
+现在我们将它混合进我们的组件：
+```js
+// src/components/Voting.jsx
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+import Winner from './Winner';
+import Vote from './Vote';
+
+export default React.createClass({
+  mixins: [PureRenderMixin],
+  // ...
+});
+
+//src/components/Vote.jsx
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+
+export default React.createClass({
+  mixins: [PureRenderMixin],
+  // ...
+});
+
+// src/components/Winner.jsx
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+
+export default React.createClass({
+  mixins: [PureRenderMixin],
+  // ...
+});
+```
+
+<h3 id="Writing_The_UI_for_The_Results_Screen_And_Handling_Routing">编写投票结果界面UI以及处理路由</h3>
+
+随着投票界面全部完成，让我们切换到应用程序另一个重要页面：显示投票结果页面。
+
+这里显示的数据与投票界面是相同的条目对，并且包含每个条目的投票数。另外，页面的底部将有一个小按钮。它可以让投票发起人
+开展下一组投票环节。
+
+现在我们有两个独立的页面，其中每一个都应该在任何时间显示。为了在它们中间作出选择，使用URL路径应该是个好主意：我们可以
+用根路径 **#/** 来显示投票界面，使用路径 **#／result** 来显示投票结果界面。
+
+通过[react-router](https://github.com/ReactTraining/react-router)库可以轻易的做到这一点：使用它我们可以将不同
+组件关联到不同路径上去。让我们在项目中添加它：
+```zsh
+npm install --save react-router@3.0.0
+```
+
+我们现在可以配置我们的路由路径，路由器带有一个名为Route的React组件，它可以被用来定义一个路由表。现在，我们只有一条路由：
+```js
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Route} from 'react-router';
+import App from './components/App';
+import Voting from './components/Voting';
+
+const pair = ['Trainspotting', '28 Days Later'];
+
+const routes = <Route component={App}>
+  <Route path="/" component={Voting} />
+</Route>;
+
+ReactDOM.render(
+  <Voting pair={pair} />,
+  document.getElementById('app')
+);
+```
+
+我们现在有一个路由，我们已经配置它指向Voting组件。我们需要做的另外一件事是在配置中定义root Route.它指向了App组件，我们
+之后将会建立它。
+
+root route组件的用途是渲染所有路由中相同的部分。我们的 **App**组件应该像下面这样：
+```js
+// src/components/App.jsx
+
+import React from 'react';
+import {List} from 'immutable';
+
+const pair = List.of('Trainspotting', '28 Days Later');
+
+export default React.createClass({
+  render: function() {
+    return React.cloneElement(this.props.children, {pair: pair});
+  }
+});
+```
+
+这个组件除了渲染它的子组件外什么也不做，预期将以 **children** prop的形式给出。这是react-router包为我们做的。它插入当前
+路由定义的组件。由于目前我们只有 **Voting**一个路由，现在这个组件永远渲染 **Voting**。
+
+注意我们已经将 **pair**数据从index.jsx移动到了App.jsx中。我们使用React的[cloneElement](https://facebook.github.io/react/docs/react-api.html#cloneelement)
+创建一个绑定了自定义**pair** props的组件。这只是一个临时性方法，后面我们会移除cloning调用。
+
+我们现在可以切换到 **index.jsx**,我们可以启动Router,并初始化我们的程序:
+```js
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import App from './components/App';
+import Voting from './components/Voting';
+
+const routes = <Route component={App}>
+  <Route path="/" component={Voting} />
+</Route>;
+
+ReactDOM.render(
+  <Router history={hashHistory}>{routes}</Router>,
+  document.getElementById('app')
+);
+```
+
+我们现在使用react-router的Router组件作为应用程序的根组件，指示它使用基于 **#hash** 的历史记录机制(而不是HTML5 history API). 
+我们将我们的路由表作为子组件传给它。
+
+有了这个，我们恢复了我们应用程序之前的功能：但它目前只渲染 **Voting**组件。这一次是通过React router来完成的，这意味着我们现在
+可以轻易的添加更多的路由。让我们来完成Result界面，他将被存储在一个Results组件中。
+```js
+// src/index.jsx
+
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import App from './components/App';
+import Voting from './components/Voting';
+import Results from './components/Results';
+
+const routes = <Route component={App}>
+  <Route path="/results" component={Results} />
+  <Route path="/" component={Voting} />
+</Route>;
+
+ReactDOM.render(
+  <Router history={hashHistory}>{routes}</Router>,
+  document.getElementById('app')
+);
+
+```
+
+现在我们再使用<Route>组件来指定'/results'路径，同时我们应该使用 **Results**组件。其余部分仍然交给 **Voting** 组件来完成。
+ 
+让我们来一个简易的 **Results** 组件实现来观察路由如何工作：
+```js
+// src/components/Results.jsx
+
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+
+export default React.createClass({
+  mixins: [PureRenderMixin],
+  render: function() {
+    return <div>Hello from results!</div>
+  }
+});
+```
+如果你现在使用浏览器访问[http://localhost:8080/#/results](http://localhost:8080/#/results),你应该可以看到来自Results
+组件的信息。此外，根路径也会显示投票按钮。你还可以前进或后退按钮在不同路由之前切换，并且当应用程序开启时，可见的组件都可以被切换。
+这是react router在行动！
+
+---
+
+这是我们在本教程使用react-router使用的全部功能。这个库能做的不仅仅于此。你可以看它的[文档](https://github.com/ReactTraining/react-router)，
+了解所有你能做的事情。
+
+---
+
+现在我们有了Results组件，让我们继续前进用它一些有用的事。它应该显示目前正在被投票的两个条目：
+```js
+// src/components/Results.jsx
+
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+
+export default React.createClass({
+  mixins: [PureRenderMixin],
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  render: function() {
+    return <div className="results">
+      {this.getPair().map(entry =>
+        <div key={entry} className="entry">
+          <h1>{entry}</h1>
+        </div>
+      )}
+    </div>;
+  }
+});
+```
+
+由于这是投票结果页面，所以实际上它也应该显示票数。这是人们想在屏幕看到的。让我们先从App组件传递一个tally Map：
+```js
+// src/components/App.jsx
+
+import React from 'react';
+import {List, Map} from 'immutable';
+
+const pair = List.of('Trainspotting', '28 Days Later');
+const tally = Map({'Trainspotting': 5, '28 Days Later': 4});
+
+export default React.createClass({
+  render: function() {
+    return React.cloneElement(this.props.children, {
+      pair: pair,
+      tally: tally
+    });
+  }
+});
+```
+
+现在我们可以调整结果组件以显示这些数字：
+```js
+// src/components/Results.jsx
+
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+
+export default React.createClass({
+  mixins: [PureRenderMixin],
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  getVotes: function(entry) {
+    if (this.props.tally && this.props.tally.has(entry)) {
+      return this.props.tally.get(entry);
+    }
+    return 0;
+  },
+  render: function() {
+    return <div className="results">
+      {this.getPair().map(entry =>
+        <div key={entry} className="entry">
+          <h1>{entry}</h1>
+          <div className="voteCount">
+            {this.getVotes(entry)}
+          </div>
+        </div>
+      )}
+    </div>;
+  }
+});
+```
+
+在这一点上，让我们先换个方向，为Results界面编写单元测试，以确保我们之后不会破坏它。
+
+我们希望组件能够为每一个条目渲染一个div,并且在div中展示条目名称以及投票数。对于没有票数的条目，相应显示的票数
+应该为0：
+```js
+// test/components/Results_spec.jsx
+
+import React from 'react';
+import {
+  renderIntoDocument,
+  scryRenderedDOMComponentsWithClass
+} from 'react-addons-test-utils';
+import {List, Map} from 'immutable';
+import Results from '../../src/components/Results';
+import {expect} from 'chai';
+
+describe('Results', () => {
+
+  it('renders entries with vote counts or zero', () => {
+    const pair = List.of('Trainspotting', '28 Days Later');
+    const tally = Map({'Trainspotting': 5});
+    const component = renderIntoDocument(
+      <Results pair={pair} tally={tally} />
+    );
+    const entries = scryRenderedDOMComponentsWithClass(component, 'entry');
+    const [train, days] = entries.map(e => e.textContent);
+
+    expect(entries.length).to.equal(2);
+    expect(train).to.contain('Trainspotting');
+    expect(train).to.contain('5');
+    expect(days).to.contain('28 Days Later');
+    expect(days).to.contain('0');
+  });
+
+});
+```
+
+接下来，我们讨论"next"按钮，它被用来开展下一组投票。
+
+从组件的视角来看，在属性中应该有一个回调函数。当"next"按钮被点击时，组件应该调用回调函数。我们可以为此编写
+单元测试，它与我们为投票按钮编写的非常相似。
+```js
+// src/components/Results.jsx
+
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+
+export default React.createClass({
+  mixins: [PureRenderMixin],
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  getVotes: function(entry) {
+    if (this.props.tally && this.props.tally.has(entry)) {
+      return this.props.tally.get(entry);
+    }
+    return 0;
+  },
+  render: function() {
+    return <div className="results">
+      <div className="tally">
+        {this.getPair().map(entry =>
+          <div key={entry} className="entry">
+            <h1>{entry}</h1>
+            <div class="voteCount">
+              {this.getVotes(entry)}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="management">
+        <button ref="next"
+                className="next"
+                onClick={this.props.next}>
+          Next
+        </button>
+      </div>
+    </div>;
+  }
+});
+```
+
+最后，和投票界面类似，当只有一个条目时，投票结果界面将展示胜者：
+```js
+// test/components/Results_spec.jsx
+
+it('renders the winner when there is one', () => {
+  const component = renderIntoDocument(
+    <Results winner="Trainspotting"
+             pair={["Trainspotting", "28 Days Later"]}
+             tally={Map()} />
+  );
+  const winner = ReactDOM.findDOMNode(component.refs.winner);
+  expect(winner).to.be.ok;
+  expect(winner.textContent).to.contain('Trainspotting');
+});
+
+```
+
+我们可以简单的复用为投票界面编写的Winner组件。如果存在一位胜者，我们渲染它替代常规的投票结果页面：
+```js
+// src/components/Results.jsx
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+import Winner from './Winner';
+
+export default React.createClass({
+  mixins: [PureRenderMixin],
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  getVotes: function(entry) {
+    if (this.props.tally && this.props.tally.has(entry)) {
+      return this.props.tally.get(entry);
+    }
+    return 0;
+  },
+  render: function() {
+    return this.props.winner ?
+      <Winner ref="winner" winner={this.props.winner} /> :
+      <div className="results">
+        <div className="tally">
+          {this.getPair().map(entry =>
+            <div key={entry} className="entry">
+              <h1>{entry}</h1>
+              <div className="voteCount">
+                {this.getVotes(entry)}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="management">
+          <button ref="next"
+                   className="next"
+                   onClick={this.props.next}>
+            Next
+          </button>
+        </div>
+      </div>;
+  }
+});
+```
+
+---
+
+这个组件分解成更小的组件是有益的。也许一个Tally组件用于显示一对条目，如果你喜欢的话，去做重构吧！
+
+---
+
+这就是我们这个简单的应用在UI方面需要的！我们写的组件还没有做任何事情，因为它们没有连接到任何真实的数据或者
+操作。然而令人惊讶的是，我们在没有需要任何数据的情况下，可以"走这么远"。我们已经向这些组件注入一些简单的数据，
+只关注于UI的结构。
+
+现在我们已经有了UI，让我们来谈谈如何通过将它的输入输出连接到一个Redux storea来实现它。

@@ -4,10 +4,13 @@
 
 import React from 'react';
 import Button from './Button';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+
 
 export default class Vote extends React.Component {
     constructor(props) {
         super(props);
+        this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
     }
 
     getPair() {
@@ -28,7 +31,6 @@ export default class Vote extends React.Component {
     }
 
     render() {
-        console.log(this.props);
         return (
             <div className="vote">
                 {this.getPair().map((entry, index) =>
