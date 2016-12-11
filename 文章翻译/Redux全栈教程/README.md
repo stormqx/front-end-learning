@@ -40,7 +40,8 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
   * [React 以及 React热加载](#React_and_react-hot-loader)
   * [编写投票界面UI](#Writing_The_UI_for_The_Voting_Screen)
   * [编写投票结果界面UI以及处理路由](#Writing_The_UI_for_The_Results_Screen_And_Handling_Routing)
-  * react从Redux获得数据
+  * [客户端Redux store介绍](#Introducing_A_Client-Side_Redux_Store)
+  * [react从Redux获得数据](#Getting_Data_In_from_Redux_to_React)
   * 安装Socket.io客户端
   * 从服务端接收Actions
   * 从react组件分发Actions
@@ -652,7 +653,7 @@ export function vote(state, entry) {
 }
 ```
 使用[updateIn](https://facebook.github.io/immutable-js/docs/#/Map/updateIn)是多么的优雅！这段代码的意思是"进入
-潜逃路由结构路径['vote', 'tally', 'Transplotting'], 并且在这里应用该函数。如果在路径中有键不存在，将会在该位置创建
+嵌套路由结构路径['vote', 'tally', 'Transplotting'], 并且在这里应用该函数。如果在路径中有键不存在，将会在该位置创建
 新的Maps。如果最后的值缺失，用"0"来进行初始化。
 
 它包装了很多层(It packs a lot of punch)，但这正是让我们可以愉快得使用Immutable data structures的那类代码，因此花点
@@ -1273,7 +1274,7 @@ export const store = makeStore();
 进行通讯。更具体的，我们使用Socket.io库，为WebSocket提供了不错的抽象，它可以跨浏览器工作。它还为不支持WebSocket的
 客户端提供了多种回退机制。
 
-让我们在项目中添加Socket.i：
+让我们在项目中添加Socket.io：
 ```zsh
 
 npm install --save socket.io
@@ -1353,11 +1354,12 @@ import Server from 'socket.io';
 
 export default function startServer() {
     const io = new Server().attach(8090);
+
+    store.subscribe(
+        () => io.emit('state', store.getState.toJS())
+    );
 }
 
-store.subscribe(
-    () => io.emit('state', store.getState.toJS())
-);
 ```
 
 ---
@@ -1378,15 +1380,17 @@ import Server from 'socket.io';
 
 export default function startServer() {
     const io = new Server().attach(8090);
+    
+    store.subscribe(
+        () => io.emit('state', store.getState.toJS())
+    );
+    
+    io.on('connection', (socket) => {
+        socket.emit('state', store.getState().toJS());
+    });
 }
 
-store.subscribe(
-    () => io.emit('state', store.getState.toJS())
-);
 
-io.on('connection', (socket) => {
-    socket.emit('state', store.getState().toJS());
-});
 ```
 <h3 id='Receiving_Remote_Redux_Actions'> 接收远程Redux Actions</h3>
 
@@ -1402,16 +1406,18 @@ import Server from 'socket.io';
 
 export default function startServer() {
     const io = new Server().attach(8090);
+    
+    store.subscribe(
+        () => io.emit('state', store.getState.toJS())
+    );
+    
+    io.on('connection', (socket) => {
+        socket.emit('state', store.getState().toJS());
+        socket.on('action', store.dispatch.bind(store));
+    });
 }
 
-store.subscribe(
-    () => io.emit('state', store.getState.toJS())
-);
 
-io.on('connection', (socket) => {
-    socket.emit('state', store.getState().toJS());
-    socket.on('action', store.dispatch.bind(store));
-});
 ```
 
 这是我们开始超越"常规Redux"的地方，因为现在我们实际上接收remote actions进入store。然而，Redux架构可以让它很容易做到：
@@ -2751,4 +2757,589 @@ export default React.createClass({
 操作。然而令人惊讶的是，我们在没有需要任何数据的情况下，可以"走这么远"。我们已经向这些组件注入一些简单的数据，
 只关注于UI的结构。
 
-现在我们已经有了UI，让我们来谈谈如何通过将它的输入输出连接到一个Redux storea来实现它。
+现在我们已经有了UI，让我们来谈谈如何通过将它的输入输出连接到一个Redux store来实现它。
+
+<h3 id='Introducing_A_Client-Side_Redux_Store'>客户端Redux store介绍</h3>
+
+实际上设计Redux是用来作为UI应用程序的state容器，就像我们正在构建的过程。到目前为止我们只是在服务器端使用了
+Redux，并且发现在服务器端它也非常有用。现在我们准备看看Redux和React如何结合起来使用，这可以说是最常用的了！
+
+与服务器端一样，我们从应用程序state开始入手。这里的state与服务器端非常类似，这不是偶然的。
+
+我们有两个UI界面。两个界面中我们都展示了将要被投票的条目对。所以有一个state是具有条目对的vote entry：
+![vote_client_pair.png](./image/vote_client_pair.png)
+
+除此这外，投票结果界面将展示投票数。这也应该在vote entry中：
+![vote_client_tally.png](./image/vote_client_tally.png)
+
+当用户已经在当前条目对中投过票，这是需要追踪的state:
+
+![vote_client_hasvoted.png](./image/vote_client_hasvoted.png)
+
+当出现了胜者，我们只需要这一个state:
+
+![vote_server_tree_winner.png](./image/vote_server_tree_winner.png)
+
+注意客户端的state除了 **hasVoted**之外，都是服务器端state的子集。
+
+下面我们实现Redux Store将使用的核心逻辑、actions和reducers. 它们应该是什么样的呢？
+
+我们可以考虑当应用程序运行时可能导致state改变的情况。state变化的一种来源是用户的actions.我们现在UI界面有两个
+用户交互：
+
+* 在投票页面用户点击投票按钮进行投票
+* 在投票结果页面用户点击NEXT按钮开展下一步。
+
+另外，我们的服务器被设置为向我们发送当前state. 我们马上编写代码来接收它。这是state改变的第三个来源。
+
+我们可以从服务器state更新开始，因为这是最直接的一个。
+
+早些时候，我们设置服务器发送一个 **state** 事件，它的有效负载几乎完全是我们的客户端state tree. 我们这么设计
+并不是巧合。从客户端reducer的视角来看，存在actions可以接收来自服务器端state快照并把它合并进客户端state中是有意义的。
+actions应该像下面这样：
+```js
+
+{
+  type: 'SET_STATE',
+  state: {
+    vote: { ... }
+  }
+}
+```
+
+让我们添加一些单元测试来看看这是如何工作的。我们期望有一个reducer,给定一个上述动作，将其有效负载合并到当前state:
+```js
+/ test/reducet_spec.js
+
+/**
+ * Created on 11/12/2016.
+ */
+
+import {List, Map, fromJS} from 'immutable';
+import {expect} from 'chai';
+
+import reducer from '../src/reducer';
+
+describe('reducer', () => {
+
+    it('handles SET_STATE', () => {
+        const initialState = Map();
+        const action = {
+            type: 'SET_STATE',
+            state: Map({
+                vote: Map({
+                    pair: List.of('Trainspotting', '28 Days Later'),
+                    tally: Map({Trainspotting: 1})
+                })
+            })
+        };
+        const nextState = reducer(initialState, action);
+
+        expect(nextState).to.equal(fromJS({
+            vote: {
+                pair: ['Trainspotting', '28 Days Later'],
+                tally: {Trainspotting: 1}
+            }
+        }));
+    });
+
+});
+```
+
+Reducer应该可以接收普通的javascript数据结构而不是Immutable data structure,这是因为它实际上是通过
+socket获得的。当它返回下一个state时，它应该被转换成Immutable data structure.
+```js
+// test/reducer_spec.js
+
+
+it('handles SET_STATE with plain JS payload', () => {
+  const initialState = Map();
+  const action = {
+    type: 'SET_STATE',
+    state: {
+      vote: {
+        pair: ['Trainspotting', '28 Days Later'],
+        tally: {Trainspotting: 1}
+      }
+    }
+  };
+  const nextState = reducer(initialState, action);
+
+  expect(nextState).to.equal(fromJS({
+    vote: {
+      pair: ['Trainspotting', '28 Days Later'],
+      tally: {Trainspotting: 1}
+    }
+  }));
+});
+```
+
+作为reducer约定的一部分，**undefined** 的初始状态应该被reducer正确的初始化为Immutable data structure:
+```js
+// test/reducer_spec.js
+
+
+it('handles SET_STATE without initial state', () => {
+  const action = {
+    type: 'SET_STATE',
+    state: {
+      vote: {
+        pair: ['Trainspotting', '28 Days Later'],
+        tally: {Trainspotting: 1}
+      }
+    }
+  };
+  const nextState = reducer(undefined, action);
+
+  expect(nextState).to.equal(fromJS({
+    vote: {
+      pair: ['Trainspotting', '28 Days Later'],
+      tally: {Trainspotting: 1}
+    }
+  }));
+});
+```
+
+这是我们的测试spec，让我们来看看如何实现它。我们应该由reducer模块导出一个reducer函数：
+```js
+//  src/reducer.js
+
+/**
+ * Created on 11/12/2016.
+ */
+
+import {Map} from 'immutable';
+
+export default function reducer(state = Map(), action) {
+
+
+    return state;
+}
+```
+
+Reducer应该处理 **SET_STATE** action. 在事件处理函数的内部，我们实际上只是将给定的新的state与旧的state
+合并起来，使用Map的[merge](https://facebook.github.io/immutable-js/docs/#/Map/merge)方法。这种方法
+完全可以让测试通过！
+```js
+// src/reducer.js
+
+/**
+ * Created on 11/12/2016.
+ */
+
+import {Map} from 'immutable';
+
+function setState(state, newState) {
+    return state.merge(newState);
+}
+
+export default function reducer(state = Map(), action) {
+
+    switch (action.type) {
+        case 'SET_STATE' :
+            return setState(state, action.state);
+    }
+
+    return state;
+}
+```
+
+---
+
+注意在这里我们没有将 "核心"逻辑模块(setState)与reducer模块分离。这是因为目前客户端reducer的逻辑太简单了。
+在这里我们只是做了合并操作，然而在服务器端可是有我们整个投票系统的逻辑。如果有需要的话，在客户端添加一些分离
+操作是更合适的。
+
+---
+
+剩下的两个导致状态发生变化的事件是：投票和点击'NEXT'按钮。由于这两个事件都涉及到与服务器端交互，我们在得到了
+适当的服务器通信架构之后再来编写它们。
+
+现在我们有个reducer,我们就可以根据它启动(spin up)一个Rudex Store.是时候在项目中添加Redux了：
+```js
+npm install --save redux
+```
+
+入口点 **index.js** 是一个很好的启动Redux store的地方。让我们模拟一些数据，在这些数据上dispatching 
+**SET_STATE** action。(这只是临时的，直到我们得到真正的数据。）
+
+```js
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import {createStore} from 'redux';
+import reducer from './reducer';
+import App from './components/App';
+import Voting from './components/Voting';
+import Results from './components/Results';
+
+const store = createStore(reducer);
+store.dispatch({
+  type: 'SET_STATE',
+  state: {
+    vote: {
+      pair: ['Sunshine', '28 Days Later'],
+      tally: {Sunshine: 2}
+    }
+  }
+});
+
+const routes = <Route component={App}>
+  <Route path="/results" component={Results} />
+  <Route path="/" component={Voting} />
+</Route>;
+
+ReactDOM.render(
+  <Router history={hashHistory}>{routes}</Router>,
+  document.getElementById('app')
+);
+```
+
+这是我们的store,现在我们如何从Store中获得state并将它传入React组件中呢？
+
+<h3 id='Getting_Data_In_from_Redux_to_React' > react从Redux获得数据</h3>
+
+我们现在已经有了持有应用程序immutable data的Redux Store。我们还有将immutable data作为输入的stateless
+React组件。这两者十分合适：如果我们能够想出一种方法，总是可以从Redux Store中获取最新的数据并传给React组件，
+这将是完美的。当state发生变化时React会重新渲染组件，同时pure render mixin(现在已经变为React.pureComponent)
+会保证不需要重新渲染的UI界面不会被渲染.(shallowly compare)
+
+我们可以使用[react-redux](https://github.com/rackt/react-redux)包中提供的Redux React绑定，而不是自己去编写这样的同步代码：
+```zsh
+npm install --save react-redux
+```
+
+react-redux的主要思想是获取我们的纯组件并且通过两件事将它连接到Redux store：
+
+1. 将Store state映射到组件输入props.
+2. 将actions映射到组件输出回调(output callback)props.
+
+在任何可能发生之前，我们需要将我们的顶级应用程序组件包装在react-redux Provider组件中。这将我们的组件树与一个Redux store连接起来，
+可以使我们在后面为单独的组件作出映射。
+
+我们在Router组件附近放入Provider组件。这将导致Provider组件成为我们应用程序组件的祖先：
+```js
+
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import {createStore} from 'redux';
+import {Provider} from 'react-redux';
+import reducer from './reducer';
+import App from './components/App';
+import {VotingContainer} from './components/Voting';
+import Results from './components/Results';
+
+const store = createStore(reducer);
+store.dispatch({
+  type: 'SET_STATE',
+  state: {
+    vote: {
+      pair: ['Sunshine', '28 Days Later'],
+      tally: {Sunshine: 2}
+    }
+  }
+});
+
+const routes = <Route component={App}>
+  <Route path="/results" component={Results} />
+  <Route path="/" component={VotingContainer} />
+</Route>;
+
+ReactDOM.render(
+  <Provider store={store}>
+    <Router history={hashHistory}>{routes}</Router>
+  </Provider>,
+  document.getElementById('app')
+);
+
+});
+```
+
+现在我们应该考虑哪些组件需要"连线"，以便获得来自Store的数据。我们有五个组件，它们可以被分为3类：
+
+* 根组件App实际上并不需要任何东西，因为它没有使用任何数据。
+* Vote和Winner组件被父组件使用，并且由父组件传递给他们所需要的props.因此它们也不需要"连线"。
+* 剩下的是我们在routes中使用的 **Voting** 和 **Results** 组件。它们目前的做法是从App组件中获得假数据。这些组件是需要"连线"
+到store上的。
+
+让我们先从 **Voting** 组件开始。react-redux有一个 **connect** 函数可以做一个组件的"连线"。它获取一个mapping函数作为
+argument和返回另外一个接收React组件的函数：
+```js
+connect(mapStateToProps)(SomeComponent);
+```
+ 
+Mappint函数的功能是将来自Redux Store的state映射成对象的props. 这些props会被合并进已连接的组件的props中。在Voting这种情况
+下，我们只需要映射state中的 **pair** 和 **winner**：
+```js
+
+// src/components/Voting.jsx
+
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin'
+import {connect} from 'react-redux';
+import Winner from './Winner';
+import Vote from './Vote';
+
+const Voting = React.createClass({
+  mixins: [PureRenderMixin],
+  render: function() {
+    return <div>
+      {this.props.winner ?
+        <Winner ref="winner" winner={this.props.winner} /> :
+        <Vote {...this.props} />}
+    </div>;
+  }
+});
+
+function mapStateToProps(state) {
+  return {
+    pair: state.getIn(['vote', 'pair']),
+    winner: state.get('winner')
+  };
+}
+
+connect(mapStateToProps)(Voting);
+
+export default Voting;
+```
+
+这不是很正确。真正的函数式风格， **connect** 函数实际上并没有运行并改变 **Voting** 组件。 **Voting** 仍然是一个纯的、无连接的组件。
+取而代之，**connect** 返回一个已连接版本的 **Voting**。这意味着我们现在的代码是不起作用的。我们需要获得返回值，我们称之为
+**VotingContainer** ：
+```js
+
+// src/components/Voting.jsx
+
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+import {connect} from 'react-redux';
+import Winner from './Winner';
+import Vote from './Vote';
+
+export const Voting = React.createClass({
+  mixins: [PureRenderMixin],
+  render: function() {
+    return <div>
+      {this.props.winner ?
+        <Winner ref="winner" winner={this.props.winner} /> :
+        <Vote {...this.props} />}
+    </div>;
+  }
+});
+
+function mapStateToProps(state) {
+  return {
+    pair: state.getIn(['vote', 'pair']),
+    winner: state.get('winner')
+  };
+}
+
+export const VotingContainer = connect(mapStateToProps)(Voting);
+```
+
+模块现在将导出两个组件：纯组件 **Voting** 和已连接组件 **VotingContainer**。React-redux文档称前者为"dumb"组件，后者为
+"start"组件。我更倾向于"pure"和"connected"。这样叫的话你可以理解它们之间的关键区别：
+
+* pure/dumb组件完全是由给定的props驱动的。它是纯函数的等价组件。
+* connected/smart组件，使用一些保持它本身与Redux store中变化的state同步的逻辑来包装纯组件。这层逻辑是由react-redux提供的。
+
+我们应该更新我们的路由表，使用 **VotingContainer** 替换 **Voting**。 一旦我们这么做，投票界面将于我们放入Redux store中的
+数据保持一致。
+```js
+
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import {createStore} from 'redux';
+import {Provider} from 'react-redux';
+import reducer from './reducer';
+import App from './components/App';
+import {VotingContainer} from './components/Voting';
+import Results from './components/Results';
+
+const store = createStore(reducer);
+store.dispatch({
+  type: 'SET_STATE',
+  state: {
+    vote: {
+      pair: ['Sunshine', '28 Days Later'],
+      tally: {Sunshine: 2}
+    }
+  }
+});
+
+const routes = <Route component={App}>
+  <Route path="/results" component={Results} />
+  <Route path="/" component={VotingContainer} />
+</Route>;
+
+ReactDOM.render(
+  <Provider store={store}>
+    <Router history={hashHistory}>{routes}</Router>
+  </Provider>,
+  document.getElementById('app')
+);
+```
+
+此外，在对于Voting的单元测试中，我们需要改变我们的倒入方式，因为我们不再默认导出 **Voting**。
+```js
+// test/components/Voting_spec.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {
+  renderIntoDocument,
+  scryRenderedDOMComponentsWithTag,
+  Simulate
+} from 'react-addons-test-utils';
+import {List} from 'immutable';
+import {Voting} from '../../src/components/Voting';
+import {expect} from 'chai';
+```
+
+关于测试代码的其他部分不需要改变。它们只是用来测试纯组件的，所以怎么都不会改变。我们只是包装了纯组件使它可以连接
+到Redux store。
+
+现在我们对投票结果页面应该使用相同的技巧。它同样需要 **pair** 和 **winner** 属性。此外它还需要 **tally**属性，
+为了显示投票数：
+```js
+// src/components/Results.jsx
+
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+import {connect} from 'react-redux';
+import Winner from './Winner';
+
+export const Results = React.createClass({
+  mixins: [PureRenderMixin],
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  getVotes: function(entry) {
+    if (this.props.tally && this.props.tally.has(entry)) {
+      return this.props.tally.get(entry);
+    }
+    return 0;
+  },
+  render: function() {
+    return this.props.winner ?
+      <Winner ref="winner" winner={this.props.winner} /> :
+      <div className="results">
+        <div className="tally">
+          {this.getPair().map(entry =>
+            <div key={entry} className="entry">
+              <h1>{entry}</h1>
+              <div className="voteCount">
+                {this.getVotes(entry)}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="management">
+          <button ref="next"
+                   className="next"
+                   onClick={this.props.next}>
+            Next
+          </button>
+      </div>
+      </div>;
+  }
+});
+
+function mapStateToProps(state) {
+  return {
+    pair: state.getIn(['vote', 'pair']),
+    tally: state.getIn(['vote', 'tally']),
+    winner: state.get('winner')
+  }
+}
+
+export const ResultsContainer = connect(mapStateToProps)(Results);
+```
+
+在 **Index.jsx** 页面中，我们应该使用 **ResultsContainer** 组件来替换results路由中的 **Results**:
+```js
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import {createStore} from 'redux';
+import {Provider} from 'react-redux';
+import reducer from './reducer';
+import App from './components/App';
+import {VotingContainer} from './components/Voting';
+import {ResultsContainer} from './components/Results';
+
+const store = createStore(reducer);
+store.dispatch({
+  type: 'SET_STATE',
+  state: {
+    vote: {
+      pair: ['Sunshine', '28 Days Later'],
+      tally: {Sunshine: 2}
+    }
+  }
+});
+
+const routes = <Route component={App}>
+  <Route path="/results" component={ResultsContainer} />
+  <Route path="/" component={VotingContainer} />
+</Route>;
+
+ReactDOM.render(
+  <Provider store={store}>
+    <Router history={hashHistory}>{routes}</Router>
+  </Provider>,
+  document.getElementById('app')
+);
+```
+
+最后，在Results的单元测试中，我们应该修改 **Results** 组件的导入方式。
+```js
+
+// test/components/Results_spec.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {
+  renderIntoDocument,
+  scryRenderedDOMComponentsWithClass,
+  Simulate
+} from 'react-addons-test-utils';
+import {List, Map} from 'immutable';
+import {Results} from '../../src/components/Results';
+import {expect} from 'chai';
+```
+
+这就是如何连接pure React component到一个Redux store上，以便它们可以从store中获得它们的数据。
+
+对于只有一个根组件，没有使用路由的小应用来说，大多数情况下连接到根组件已经足够了。根组件接下来可以根据props向它的
+children传播数据。对于使用路由的应用来说，像我们现在做的，连接每一个路由组件通常是个好主意。因为任何组件都是单独
+连接，因此不同的策略可以用于不同的应用程序架构中。我认为无论什么时候使用普通的props是一个好主意，因为使用props可以
+很容易看到什么数据进入，并且因为你不需要管理"连线"代码，这样可以减少工作量。
+
+现在我们的UI界面可以从Redux获取数据，我们不再需要在 **App.jsx** 中加入props,因此它变得比之前更简单：
+```js
+// src/index.jsx
+
+import React from 'react';
+
+export default class App extends React.Component {
+    constructor(props) {
+        super(props);
+    }
+
+
+    render() {
+        return this.props.children;
+    }
+}
+```
