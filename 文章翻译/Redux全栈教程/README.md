@@ -43,7 +43,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
   * [客户端Redux store介绍](#Introducing_A_Client-Side_Redux_Store)
   * [react从Redux获得数据](#Getting_Data_In_from_Redux_to_React)
   * [安装Socket.io客户端](#Setting_Up_The_Socket.io_Client)
-  * 从服务端接收Actions
+  * [从服务端接收Actions](#Receiving_Actions_From_The_Server)
   * 从react组件分发Actions
   * 使用Redux中间件向服务端发送Actions
 
@@ -3409,3 +3409,47 @@ ReactDOM.render(
 在开发过程中，页面中实际上是有两个Socket.io连接。一个是我们的应用程序，另外一个是支持Webpack热加载的。
 
 ---
+
+<h3 id='Receiving_Actions_From_The_Server'> 从服务端接收Actions</h3>
+
+我们现在已经有了socket.io连接，实际上我们不需要做很多工作来从中获取数据。服务器正在向我们发送 **state** events——
+当我们连接上服务器时或者当状态发生变化时。我们只需要监听这些events。当我们获得了一个时，我们就可以dispatch一个
+**SET_STATE**action给Redux store。我们已经有了相应的reducer来处理它：
+```js
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import {createStore} from 'redux';
+import {Provider} from 'react-redux';
+import io from 'socket.io-client';
+import reducer from './reducer';
+import App from './components/App';
+import {VotingContainer} from './components/Voting';
+import {ResultsContainer} from './components/Results';
+
+const store = createStore(reducer);
+
+const socket = io(`${location.protocol}//${location.hostname}:8090`);
+socket.on('state', state =>
+  store.dispatch({type: 'SET_STATE', state})
+);
+
+const routes = <Route component={App}>
+  <Route path="/results" component={ResultsContainer} />
+  <Route path="/" component={VotingContainer} />
+</Route>;
+
+ReactDOM.render(
+  <Provider store={store}>
+    <Router history={hashHistory}>{routes}</Router>
+  </Provider>,
+  document.getElementById('app')
+);
+```
+
+注意我们已经去除了模拟的 **SET_STATE** dispatch。因为服务器将会给我们真实的数据，所以我们不再需要它。
+
+观察UI界面——无论是Voting界面还是Results界面——现在都将会显示我们在服务器端定义的entries中的第一对条目。
+我们的服务器端和客户端连接起来了！
