@@ -42,7 +42,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
   * [编写投票结果界面UI以及处理路由](#Writing_The_UI_for_The_Results_Screen_And_Handling_Routing)
   * [客户端Redux store介绍](#Introducing_A_Client-Side_Redux_Store)
   * [react从Redux获得数据](#Getting_Data_In_from_Redux_to_React)
-  * 安装Socket.io客户端
+  * [安装Socket.io客户端](#Setting_Up_The_Socket.io_Client)
   * 从服务端接收Actions
   * 从react组件分发Actions
   * 使用Redux中间件向服务端发送Actions
@@ -3343,3 +3343,69 @@ export default class App extends React.Component {
     }
 }
 ```
+
+<h3 id='Setting_Up_The_Socket.io_Client'> 安装Socket.io客户端</h3>
+
+现在我们已经有了一个可以运行的Redux客户端程序，我们可以谈谈如何将它连接到我们在服务器上运行的其他Redux应用程序。它们两个
+目前各自住在各自的宇宙中，在它们之间没有任何连接。
+
+服务器已经准备好接收入站socket连接并向其发出投票state。另一方面，客户端有一个Redux store, 我们可以轻松的调度传入的数据。
+我们现在需要做的是建立连接。
+
+这首先要让基础设施到位。我们需要一种方法来建立浏览器到服务器的socket.io连接。为此，我们可以使用[socket.io-client library](http://socket.io/docs/client-api/)
+,它等同于我们在服务器端使用的socket.io库。
+```zsh
+npm install --save socket.io-client
+```
+
+导入这个库之后，我们使用它提供的 **io**函数来建立与服务器之间的连接。假设我们与服务器端在同一个主机上，让我们连接到8090端口
+(匹配我们在服务器端使用的端口号。)
+```js
+// src/index.jsx
+
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import {createStore} from 'redux';
+import {Provider} from 'react-redux';
+import io from 'socket.io-client';
+import reducer from './reducer';
+import App from './components/App';
+import {VotingContainer} from './components/Voting';
+import {ResultsContainer} from './components/Results';
+
+const store = createStore(reducer);
+store.dispatch({
+  type: 'SET_STATE',
+  state: {
+    vote: {
+      pair: ['Sunshine', '28 Days Later'],
+      tally: {Sunshine: 2}
+    }
+  }
+});
+
+const socket = io(`${location.protocol}//${location.hostname}:8090`);
+
+const routes = <Route component={App}>
+  <Route path="/results" component={ResultsContainer} />
+  <Route path="/" component={VotingContainer} />
+</Route>;
+
+ReactDOM.render(
+  <Provider store={store}>
+    <Router history={hashHistory}>{routes}</Router>
+  </Provider>,
+  document.getElementById('app')
+);
+```
+
+如果你现在使你的服务器运行起来，在浏览器中打开客户端程序并且检查网络流量，你应该看到了它生成了WebSocket连接并
+开始在上面传输Socket.io heartbeats。
+
+---
+
+在开发过程中，页面中实际上是有两个Socket.io连接。一个是我们的应用程序，另外一个是支持Webpack热加载的。
+
+---
