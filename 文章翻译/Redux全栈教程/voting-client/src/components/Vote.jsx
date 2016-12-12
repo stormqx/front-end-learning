@@ -4,26 +4,20 @@
 
 import React from 'react';
 import Button from './Button';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
+import {Seq} from 'immutable';
 
-
-export default class Vote extends React.Component {
+export default class Vote extends React.PureComponent {
     constructor(props) {
         super(props);
-        this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
+        this.isDisabled = this.isDisabled.bind(this);
     }
 
     getPair() {
-        return this.props.pair;
+        return Seq(this.props.pair);
     }
 
     isDisabled() {
         return !!this.props.hasVoted;
-    }
-
-    vote(entry) {
-        //投票方法
-        console.log(entry);
     }
 
     hasVotedFor(entry) {
@@ -33,13 +27,13 @@ export default class Vote extends React.Component {
     render() {
         return (
             <div className="vote">
-                {this.getPair().map((entry, index) =>
+                {this.getPair().map((entry,index) =>
                     <Button
                         key={index}
                         entry={entry}
-                        vote={this.vote.bind(this)}
+                        vote={this.props.vote}
                         hasVotedFor={this.hasVotedFor(entry)}
-                        isDisabled={this.isDisabled.bind(this)}>
+                        isDisabled={this.isDisabled()}>
                     </Button>)
                 }
             </div>

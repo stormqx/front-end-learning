@@ -1,14 +1,14 @@
 import React from 'react';
 import Winner from './Winner';
 import Vote from './Vote';
+import {List} from 'immutable';
 import {connect} from 'react-redux';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
+import * as actionCreators from '../action_creators';
 
 
-export class Voting extends React.Component {
+export class Voting extends React.PureComponent {
     constructor(props) {
         super(props);
-        this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
     }
 
 
@@ -26,9 +26,13 @@ export class Voting extends React.Component {
 
 function mapStateToProps(state) {
     return {
-        pair: state.getIn(['vote', 'pair']),
+        pair: state.getIn(['vote', 'pair'],List()),
+        hasVoted: state.get('hasVoted'),
         winner: state.get('winner')
     }
 }
 
-export const VotingContainer = connect(mapStateToProps)(Voting);
+export const VotingContainer = connect(
+    mapStateToProps,
+    actionCreators
+)(Voting);

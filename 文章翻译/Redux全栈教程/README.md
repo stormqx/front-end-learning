@@ -44,7 +44,7 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
   * [react从Redux获得数据](#Getting_Data_In_from_Redux_to_React)
   * [安装Socket.io客户端](#Setting_Up_The_Socket.io_Client)
   * [从服务端接收Actions](#Receiving_Actions_From_The_Server)
-  * 从react组件分发Actions
+  * [从react组件分发Actions](#Dispatching_Actions_From_React_Component)
   * 使用Redux中间件向服务端发送Actions
 
 <h3 id="What_You_Will_Need"> 你所需要的</h3>
@@ -3453,3 +3453,304 @@ ReactDOM.render(
 
 观察UI界面——无论是Voting界面还是Results界面——现在都将会显示我们在服务器端定义的entries中的第一对条目。
 我们的服务器端和客户端连接起来了！
+
+<h3 id='Dispatching_Actions_From_React_Component'> 从react组件分发Actions</h3>
+
+我们已经知道了如何从Redux store获得数据传递给UI界面。接下来我们讨论如何获得从UI界面发出的actions。
+
+思考这个问题最好的场合应该是投票按钮。在我们已经建立的UI界面中，我们假设 **Voting**组件可以接收一个 **vote**
+属性，它实质上是一个回调函数。当用户点击其中一个条目按钮，组件就会调用这个函数。但是实际上我们还没有提供这个
+回调函数——除了在单元测试中。
+
+当一个用户作出投票操作时到底会发生什么呢？当然，投票应该很容易发送到服务器，我们过一会来讨论它。这个操作也涉及
+到客户端逻辑：组件的 **hasVoted** 属性应该被设置，因此用户不能对同一对条目进行多次投票。
+
+这将是 **SET_STATE** action之后的第二个客户端Rudex action。我们称它为 **vote**。它应该填充state Map中的
+**hasVoted** 条目。
+```js
+// test/reducer_spec.js
+
+it('handles VOTE by setting hasVoted', () => {
+  const state = fromJS({
+    vote: {
+      pair: ['Trainspotting', '28 Days Later'],
+      tally: {Trainspotting: 1}
+    }
+  });
+  const action = {type: 'VOTE', entry: 'Trainspotting'};
+  const nextState = reducer(state, action);
+
+  expect(nextState).to.equal(fromJS({
+    vote: {
+      pair: ['Trainspotting', '28 Days Later'],
+      tally: {Trainspotting: 1}
+    },
+    hasVoted: 'Trainspotting'
+  }));
+});
+```
+
+如果由于任何原因，对于目前没有处于投票节点的条目进行投票操作的话，不设置该条目是个好主意：
+```js
+// test/reducer_spec.js
+
+it('does not set hasVoted for VOTE on invalid entry', () => {
+  const state = fromJS({
+    vote: {
+      pair: ['Trainspotting', '28 Days Later'],
+      tally: {Trainspotting: 1}
+    }
+  });
+  const action = {type: 'VOTE', entry: 'Sunshine'};
+  const nextState = reducer(state, action);
+
+  expect(nextState).to.equal(fromJS({
+    vote: {
+      pair: ['Trainspotting', '28 Days Later'],
+      tally: {Trainspotting: 1}
+    }
+  }));
+});
+```
+
+下面是扩展后的reducer:
+```js
+// src/reducer.js
+
+import {Map} from 'immutable';
+
+function setState(state, newState) {
+  return state.merge(newState);
+}
+
+function vote(state, entry) {
+  const currentPair = state.getIn(['vote', 'pair']);
+  if (currentPair && currentPair.includes(entry)) {
+    return state.set('hasVoted', entry);
+  } else {
+    return state;
+  }
+}
+
+export default function(state = Map(), action) {
+  switch (action.type) {
+  case 'SET_STATE':
+    return setState(state, action.state);
+  case 'VOTE':
+    return vote(state, action.entry);
+  }
+  return state;
+}
+```
+
+**hasVoted** 条目不应该一直存在于state中。当投票进行到下一对条目时，它应该被重新设置为了下一对条目可以进行投票。
+我们应该在 **setState** 中来处理这个问题，在这里我们可以检查新的状态中条目对是否包含用户已经投票过的条目。如果
+它不包含，我们应该去除掉 **hasVoted** 属性。
+```js
+// test/reducer_spec.js
+
+it('removes hasVoted on SET_STATE if pair changes', () => {
+  const initialState = fromJS({
+    vote: {
+      pair: ['Trainspotting', '28 Days Later'],
+      tally: {Trainspotting: 1}
+    },
+    hasVoted: 'Trainspotting'
+  });
+  const action = {
+    type: 'SET_STATE',
+    state: {
+      vote: {
+        pair: ['Sunshine', 'Slumdog Millionaire']
+      }
+    }
+  };
+  const nextState = reducer(initialState, action);
+
+  expect(nextState).to.equal(fromJS({
+    vote: {
+      pair: ['Sunshine', 'Slumdog Millionaire']
+    }
+  }));
+});
+```
+
+我们可以在 **SET_STATE** action handler上组合一个 **resetVote** 函数来实现。
+```js
+// src/reducer.js
+
+import {List, Map} from 'immutable';
+
+function setState(state, newState) {
+  return state.merge(newState);
+}
+
+function vote(state, entry) {
+  const currentPair = state.getIn(['vote', 'pair']);
+  if (currentPair && currentPair.includes(entry)) {
+    return state.set('hasVoted', entry);
+  } else {
+    return state;
+  }
+}
+
+function resetVote(state) {
+  const hasVoted = state.get('hasVoted');
+  const currentPair = state.getIn(['vote', 'pair'], List());
+  if (hasVoted && !currentPair.includes(hasVoted)) {
+    return state.remove('hasVoted');
+  } else {
+    return state;
+  }
+}
+
+export default function(state = Map(), action) {
+  switch (action.type) {
+  case 'SET_STATE':
+    return resetVote(setState(state, action.state));
+  case 'VOTE':
+    return vote(state, action.entry);
+  }
+  return state;
+}
+```
+
+---
+
+用于确认hasVoted属性是否适用于当前条目对的逻辑有一些问题。你可以在exercises找出一种方式来改进它。
+
+---
+
+我们还没有将 **hasVoted** 条目作为属性连接到 **Voting** 组件上，因此我们应该这么做：
+```
+// src/components/Voting.jsx
+
+function mapStateToProps(state) {
+  return {
+    pair: state.getIn(['vote', 'pair']),
+    hasVoted: state.get('hasVoted'),
+    winner: state.get('winner')
+  };
+}
+```
+
+现在对于 **Voting** 组件，我们仍需要一个 **vote** 回调函数，它将导致新的action被分发。我们应该保证**Voting**
+组件是纯的并且没有意识到actions或者Redux的存在。换句话说，这是react-redux中 **connect** 函数的另一用法。
+
+不仅仅可以包装输入属性，react-redux还可以被用来包装输出actions。在我们实现之前，需要先介绍Redux另外一个核心概念：
+Action creators。
+
+我们已经知道Redux actions只是一些普通的对象(按照惯例),它有一个 **type** 属性和一些与actions相关的特定数据。我们
+已经通过简单的对象字面量(object literals)来创建这些actions。然而，使用少量的工厂函数来代替生成actions是更合适的。
+函数类似下面：
+```js
+
+function vote(entry) {
+  return {type: 'VOTE', entry};
+}
+```
+
+这些函数又被成为action creators。它们其实并没有做什么——它们只是返回action object的纯函数——但它们做的是封装动作对象
+的内部结构，这样代码库中的其他部分不需要关心这些细节。Action creators还可以方便的记录在特定应用程序中可以被分发的所有
+actions。如果这些信息以对象字面量的方式散布在代码库中，那么这些信息会非常难收集。
+
+让我们新建一个包含action creators的文件，这些action creators定义了两个已经存在的客户端action。
+```js
+/**
+ * Created on 12/12/2016.
+ */
+
+// src/action_creators.js
+
+export function setState(state) {
+    return {
+        type: 'SET_STATE',
+        state
+    }
+}
+
+export function vote(entry) {
+    return {
+        type: 'VOTE',
+        entry
+    }
+}
+```
+
+在 **index.jsx** 页面，我们可以在socket.io事件处理程序中使用 **setState** action creator。
+```js
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import {createStore} from 'redux';
+import {Provider} from 'react-redux';
+import io from 'socket.io-client';
+import reducer from './reducer';
+import {setState} from './action_creators';
+import App from './components/App';
+import {VotingContainer} from './components/Voting';
+import {ResultsContainer} from './components/Results';
+
+const store = createStore(reducer);
+
+const socket = io(`${location.protocol}//${location.hostname}:8090`);
+socket.on('state', state =>
+  store.dispatch(setState(state))
+);
+
+const routes = <Route component={App}>
+  <Route path="/results" component={ResultsContainer} />
+  <Route path="/" component={VotingContainer} />
+</Route>;
+
+ReactDOM.render(
+  <Provider store={store}>
+    <Router history={hashHistory}>{routes}</Router>
+  </Provider>,
+  document.getElementById('app')
+);
+```
+
+关于action creators一个整洁的方面是react-redux将它们连接到React组件的方式：在 **Voting** 组件上有**vote** 
+回调属性，我们还有一个 **vote** action creator。它们俩有相同的名字：一个参数，它是被投票的条目。我们需要做的
+仅仅是将action creators作为第二个参数传给react-redux **connect** 函数，接下来就会产生连接：
+```js
+
+src/components/Voting.jsx
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+import {connect} from 'react-redux';
+import Winner from './Winner';
+import Vote from './Vote';
+import * as actionCreators from '../action_creators';
+
+export const Voting = React.createClass({
+  mixins: [PureRenderMixin],
+  render: function() {
+    return <div>
+      {this.props.winner ?
+        <Winner ref="winner" winner={this.props.winner} /> :
+        <Vote {...this.props} />}
+    </div>;
+  }
+});
+
+function mapStateToProps(state) {
+  return {
+    pair: state.getIn(['vote', 'pair']),
+    hasVoted: state.get('hasVoted'),
+    winner: state.get('winner')
+  };
+}
+
+export const VotingContainer = connect(
+  mapStateToProps,
+  actionCreators
+)(Voting);
+```
+
+这样做的影响是一个 **vote** 属性将传给 **Voting** 组件。这个属性是使用 **vote** action creator创建一个action
+的函数，并且向Redux store分发action。因此，现在点击投票按钮将会分发一个事件！你应该可以立即在浏览器中看到效果：当
+你作出投票后，按钮将会变得disabled。
