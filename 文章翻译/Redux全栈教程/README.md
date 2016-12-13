@@ -45,7 +45,14 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
   * [安装Socket.io客户端](#Setting_Up_The_Socket.io_Client)
   * [从服务端接收Actions](#Receiving_Actions_From_The_Server)
   * [从react组件分发Actions](#Dispatching_Actions_From_React_Component)
-  * 使用Redux中间件向服务端发送Actions
+  * [使用Redux中间件向服务端发送Actions](#Sending_Actions_To_The_Server_Using_Redux_Middleware)
+* 练习
+  * 预防无效投票
+  * 改进投票state重置
+  * 预防重复投票
+  * 重新开始投票
+  * 指示套接字连接state
+  * 加分挑战：Going Peer To Peer
 
 <h3 id="What_You_Will_Need"> 你所需要的</h3>
 
@@ -3754,3 +3761,329 @@ export const VotingContainer = connect(
 这样做的影响是一个 **vote** 属性将传给 **Voting** 组件。这个属性是使用 **vote** action creator创建一个action
 的函数，并且向Redux store分发action。因此，现在点击投票按钮将会分发一个事件！你应该可以立即在浏览器中看到效果：当
 你作出投票后，按钮将会变得disabled。
+
+<h3 id='Sending_Actions_To_The_Server_Using_Redux_Middleware'> 使用Redux中间件向服务端发送Actions</h3>
+
+我们应用程序的最后一个方面是解决服务器如何获得用户操作结果的问题。这会发生在用户进行投票时，也会发生在投票发起者在
+投票结果页面点击NEXT按钮时。
+
+让我们开始讨论投票过程。下面是一个我们已经实现的清单：
+
+* 当用户进行投票时，一个 **vote** action将会被创建并分发给客户端Redux store。
+* **vote** actions将会被reducer处理并且设置 **hasVoted** state。
+* 服务器端通过 **action** socket.io事件已经准备好接收来自客户端的actions。它将向服务器端Redux store分发所有已
+接收到的actions。
+* 服务端Redux store通过登记投票的方式来处理**vote** actions，并且会更新相应票数。
+
+看起来我们几乎已经拥有了所需要的一切！唯独缺少的是将客户端的 **vote** actions发送给服务器端，这样它可以被分配到服务器端
+和客户端两个Redux store。我们接下来就来完成它！
+
+我们应该如何处理它呢？Redux没有为这个目的内置一些东西，因为像我们这样支持一个分布式系统实际上并不属于Redux的核心功能。
+它让我们自己决定如何向服务器端发送客户端actions。
+
+Redux提供了一种通用方式来访问被分发到Redux store的actions：[Middleware](http://redux.js.org/docs/advanced/Middleware.html)
+
+Redux middleware是一个函数，它会在actions被分发的时候被调用，并且调用发生在reducer和store执行actions之前。middleware
+可以做任何事情，从日志记录和异常处理到修改actions,缓存结果，甚至改变事件到达store的方式和时间。我们将要使用它来向服务器端
+发送客户端actions。
+
+---
+
+注意Redux middleware和Redux listener的区别：Middleware在actions到达store之前被调用，它们可以影响actions的动作。Listener
+是在action被分发之后才被调用，它实际上并不能改变actions。它们是为了不同目的的不同工具。
+
+---
+
+我们打算做的是创建一个"remote action middleware", 它可以使被分发的actions不仅可以到达原来的store, 也可以到达使用socket.io到达
+远程的store.
+
+我们先把middleware框架搭起来。它是一个函数，输入参数为Redux store,返回一个将"next"回调函数作为输入参数的函数2。函数2可以
+返回第三个将Redux action作为输入参数的函数3。函数3将是middleware真正要实现的地方：
+```js
+// src/remote_action_middleware.js
+
+export default store => next => action => {
+
+}
+```
+
+上面的代码看起来有点不专业，但是实际上它不过是一种更简洁的表达方式：
+```js
+export default function(store) {
+  return function(next) {
+    return function(action) {
+
+    }
+  }
+}
+```
+
+这种嵌套的单参数函数的形式被称为[currying](https://en.wikipedia.org/wiki/Currying)。在这种情况下使用它是为了让middleware
+更容易配置。如果我们一个包含了所有参数的函数( **function(store, next, action) { }** )。我们必须在每次使用middlerware都要
+提供所有参数。使用curry版本，我们可以调用最外层函数一次，并获得一个"记忆"使用哪个store的返回值。 **next**参数同样如此。
+
+**next** 参数是middleware在完成其工作后调用的回调函数，并且action应该被发往store(或者下一个middleware)：
+```js
+// src/remote_action_middleware.js
+
+export default store => next => action => {
+  return next(action);
+}
+```
+
+---
+
+middleware也可以决定不调用 **next** , 如果它决定应该进行暂停操作。在这种情况下，它不会进入reducer或者store。
+
+---
+
+让我们在middleware中log一些东西，这样我们可以它被调用的时间：
+```js
+// src/remote_action_middleware.js
+
+export default store => next => action => {
+  console.log('in middleware', action);
+  return next(action);
+}
+```
+
+如果我们现在将middleware添加进Redux store, 我们应该可以看到所有的actions被logged。middleware可以使用Redux附带的 **applyMiddleware**
+函数来启动。它接收我们需要注册的middleware, 并且返回一个接收 **createStore** 函数的函数。第二个函数将会为我们建立一个包含middleware
+的store。
+```js
+// src/index.jsx
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import {Router, Route, hashHistory} from 'react-router';
+import {createStore, applyMiddleware} from 'redux';
+import {Provider} from 'react-redux';
+import io from 'socket.io-client';
+import reducer from './reducer';
+import {setState} from './action_creators';
+import remoteActionMiddleware from './remote_action_middleware';
+import App from './components/App';
+import {VotingContainer} from './components/Voting';
+import {ResultsContainer} from './components/Results';
+
+const createStoreWithMiddleware = applyMiddleware(
+  remoteActionMiddleware
+)(createStore);
+const store = createStoreWithMiddleware(reducer);
+
+const socket = io(`${location.protocol}//${location.hostname}:8090`);
+socket.on('state', state =>
+  store.dispatch(setState(state))
+);
+
+const routes = <Route component={App}>
+  <Route path="/results" component={ResultsContainer} />
+  <Route path="/" component={VotingContainer} />
+</Route>;
+
+ReactDOM.render(
+  <Provider store={store}>
+    <Router history={hashHistory}>{routes}</Router>
+  </Provider>,
+  document.getElementById('app')
+);
+```
+
+---
+
+我们刚才讨论的配置环节是另外一个使用curry风格的实例。Redux API使用它占了相当大的比重。
+
+---
+
+如果你现在重载app, 你将会看到middleware logging事件发生: 一个是初始化 **SET_STATE** action, 一个是 **VOTE**
+action。
+
+这个middleware实际上应该向Socket.io连接发送特定的action, 除了给它下一个中间件。(What this middleware should
+actually do is send a given action to a Socket.io connection, in addition to giving it to the next
+middleware.) 在它实现之前，需要连接来发送它。我们在 **index.jsx** 中已经有了一个连接——我们只需要middleware可以
+访问到它。在中间件定义中使用curry很容易实现。最外层函数应该使用socket.io套接字：
+```js
+
+// src/remote_action_middleware.js
+
+export default socket => store => next => action => {
+  console.log('in middleware', action);
+  return next(action);
+}
+```
+
+现在我们可以从 **index.jsx** 传入套接字：
+```js
+// src/index.jsx
+
+const socket = io(`${location.protocol}//${location.hostname}:8090`);
+socket.on('state', state =>
+  store.dispatch(setState(state))
+);
+
+const createStoreWithMiddleware = applyMiddleware(
+  remoteActionMiddleware(socket)
+)(createStore);
+const store = createStoreWithMiddleware(reducer);
+```
+
+注意我们需要调换 **socket** 和 **store** 的初始化顺序，即先创建socket。我们在store的初始化过程中需要它。
+
+现在剩下需要做的是从中间件发送一个 **action** :
+```js
+// src/remote_action_middleware.js
+
+export default socket => store => next => action => {
+  socket.emit('action', action);
+  return next(action);
+}
+```
+
+就是这样，如果你点击其中一个投票按钮，你会在同一浏览器窗口或者其他浏览器窗口中看到票数更新。投票正在注册！
+
+关于现在的想法还有一个主要问题：当我们获得了来自服务器端更新的state并且分发了 **SET_STATE** action，它也直接
+回到服务器端。服务器端的监听仍然被触发，将产生一个新的 **SET_STATE**。 我们进入了无限循环！这当然是非常糟糕的。
+
+remote action middleware向服务器发送每个action是不合适的。有些action，比如说 **SET_STATE**, 应该只需要在
+客户端本地处理。我们可以扩展middleware只向服务器端发送特定的action。具体的是，我们应该只发送带有 **{meta: {remote: true}}**
+属性的action.
+
+---
+
+此模式是根据[middleware documentation](http://redux.js.org/docs/advanced/Middleware.html#seven-examples)
+中的rafScheduler示例进行调整。
+```js
+// src/remote_action_middleware.js
+
+export default socket => store => next => action => {
+  if (action.meta && action.meta.remote) {
+    socket.emit('action', action);
+  }
+  return next(action);
+}
+```
+
+**Vote** 的action creator 应该设置这个属性, **SET_STATE** 则不设置这个属性:
+```js
+// src/action_creators.js
+
+export function setState(state) {
+  return {
+    type: 'SET_STATE',
+    state
+  };
+}
+
+export function vote(entry) {
+  return {
+    meta: {remote: true},
+    type: 'VOTE',
+    entry
+  };
+}
+```
+
+现在我们来回顾一下刚才发生的事情：
+
+* 用户点击投票按钮。**VOTE** action将会被分发。
+* 在action进入reducer或者store前，先由remote action middleware通过Socket.io连接发送action.
+* 客户端Rudex store接收了action,将本地 **hasVoted** 属性设置为true.
+* 当消息发送到服务器端，服务器端Redux store接收并处理了action,更新了相应条目的投票数.
+* 服务器端Redux store的监听器向所以已连接的客户端广播一个state快照。
+* **SET_STATE** action被分发向所有已连接的客户端Redux store.
+* 所有已连接的客户端Redux store使用来自服务器端更新后的state来处理 **SET_STATE** action.
+
+为了完成我们的应用程序，我们只需要让NEXT按钮工作即可。和投票按钮一样，服务器端也已经有了相应的逻辑.我们只需要
+把它们连起来。
+
+**NEXT** action creator需要创建正确类型的远程操作：
+```js
+// src/action_creator.js
+
+export function setState(state) {
+  return {
+    type: 'SET_STATE',
+    state
+  };
+}
+
+export function vote(entry) {
+  return {
+    meta: {remote: true},
+    type: 'VOTE',
+    entry
+  };
+}
+
+export function next() {
+  return {
+    meta: {remote: true},
+    type: 'NEXT'
+  };
+}
+```
+
+ResultsContainer组件应该将action creators作为属性连接起来。
+```js
+// src/components/Results.jsx
+
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+import {connect} from 'react-redux';
+import Winner from './Winner';
+import * as actionCreators from '../action_creators';
+
+export const Results = React.createClass({
+  mixins: [PureRenderMixin],
+  getPair: function() {
+    return this.props.pair || [];
+  },
+  getVotes: function(entry) {
+    if (this.props.tally && this.props.tally.has(entry)) {
+      return this.props.tally.get(entry);
+    }
+    return 0;
+  },
+  render: function() {
+    return this.props.winner ?
+      <Winner ref="winner" winner={this.props.winner} /> :
+      <div className="results">
+        <div className="tally">
+          {this.getPair().map(entry =>
+            <div key={entry} className="entry">
+              <h1>{entry}</h1>
+              <div className="voteCount">
+                {this.getVotes(entry)}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="management">
+          <button ref="next"
+                   className="next"
+                   onClick={this.props.next}>
+            Next
+          </button>
+        </div>
+      </div>;
+  }
+});
+
+function mapStateToProps(state) {
+  return {
+    pair: state.getIn(['vote', 'pair']),
+    tally: state.getIn(['vote', 'tally']),
+    winner: state.get('winner')
+  }
+}
+
+export const ResultsContainer = connect(
+  mapStateToProps,
+  actionCreators
+)(Results);
+```
+
+啊...就是这样！我们现在有一个完整的、正常运行的应用程序。试着在你电脑上打开投票结果页面，在手机端打开投票
+界面。你将会看到一个设备上的action将会立即影响另外一个设备。这是感觉神奇的一件事：在一个界面上进行投票，在
+另外一个界面上看到投票结果更新。点击投票结果界面上的"NEXT"按钮，并且在投票设备上观察投票进展。为了使它更有
+趣，下次与朋友一起的时候安排一次投票吧！
