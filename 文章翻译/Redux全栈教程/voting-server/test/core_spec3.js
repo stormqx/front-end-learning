@@ -43,7 +43,27 @@ describe('application logic', () => {
                     '28 Days Later': 2
                 })
             }));
-
         });
+
+        it('tally won`t be added when voted entry isn`t included in the current pair', () => {
+            const state = Map({
+                pair: List.of('Transplotting', '28 Days Later'),
+                tally: Map({
+                    'Transplotting': 3,
+                    '28 Days Later': 2
+                })
+            });
+
+            const nextState = vote(state, 'Sunshine');
+
+            expect(nextState).to.equal(Map({
+                pair: List.of('Transplotting', '28 Days Later'),
+                tally: Map({
+                    'Transplotting': 3,
+                    '28 Days Later': 2
+                })
+            }));
+        });
+
     });
 });
