@@ -2,16 +2,25 @@
  * Created on 11/12/2016.
  */
 
-import {List, Map} from 'immutable';
+import {List, Map, fromJS} from 'immutable';
 
 function setState(state, newState) {
-    return state.merge(newState);
+    let mergedState = state.merge(newState);
+    const oldRound = state.getIn(['vote', 'round']);
+    const newRound = fromJS(newState).getIn(['vote', 'round']);
+    console.log(oldRound);
+    console.log(newRound);
+    if( mergedState.get('hasVoted') && oldRound !== newRound ) {
+        return mergedState.remove('hasVoted');
+    } else {
+        return mergedState;
+    }
 }
 
 function resetVote(state) {
     const hasVoted = state.get('hasVoted');
     const currentPair = state.getIn(['vote', 'pair'], List());
-    if (hasVoted && !currentPair.includes(hasVoted)) {
+    if(hasVoted && !currentPair.includes(hasVoted)) {
         return state.remove('hasVoted');
     } else {
         return state;

@@ -58,8 +58,8 @@ npm run test
 #TODO List
 
 * add some styles for a nicer UI.
-* (Bug)In voting-client, This logic for determining whether the **hasVoted** entry is for the current pair is slightly
-problematic.
-* writing the exercises at the end of the tutorial
+* ~~(Bug)In voting-client, This logic for determining whether the **hasVoted** entry is for the current pair is slightly
+problematic.~~
+* ~~writing the exercises at the end of the tutorial~~ (complete exercise1, exercise2)
 
 

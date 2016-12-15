@@ -3,7 +3,7 @@
  */
 
 
-import {List, Map} from 'immutable';
+import {List, Map, fromJS} from 'immutable';
 import {expect} from 'chai';
 import {next} from '../src/core';
 
@@ -26,6 +26,32 @@ describe('next', () => {
         expect(nextState).to.equal(Map({
             winner: 'Trainspotting'
         }));
+    });
+
+    it('add unique identifier', () => {
+
+        const state = fromJS({
+            vote: {
+                pair: ['Transplotting', '28 Days Later'],
+                round: 1,
+                tally: {
+                    'Transplotting': 4,
+                    '28 Days Later': 2
+                }
+            },
+            entries: ['Sunshine', 'Millions', '127 Hours']
+        });
+
+        const nextState = next(state);
+        expect(nextState).to.equal(fromJS({
+            vote: {
+                pair: ['Sunshine', 'Millions'],
+                round: 2
+            },
+            entries: ['127 Hours', 'Transplotting']
+
+        }));
+
     });
 
 });

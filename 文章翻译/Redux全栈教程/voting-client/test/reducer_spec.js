@@ -134,4 +134,16 @@ describe('reducer', () => {
         }));
     });
 
+    it('check out Immutable.is', () => {
+
+        const list = List([]);
+
+        const isEqual = list.isEmpty();
+
+        const countNum = list.count();
+
+        expect(countNum).to.equal(0);
+        expect(isEqual).to.equal(true);
+    });
+
 });

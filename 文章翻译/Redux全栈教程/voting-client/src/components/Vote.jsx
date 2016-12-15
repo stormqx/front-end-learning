@@ -10,6 +10,7 @@ export default class Vote extends React.PureComponent {
     constructor(props) {
         super(props);
         this.isDisabled = this.isDisabled.bind(this);
+        this.hasVotedFor = this.hasVotedFor.bind(this);
     }
 
     getPair() {

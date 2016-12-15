@@ -27,7 +27,8 @@ describe("application logic", () => {
            const nextState = next(state);
            expect(nextState).to.equal(fromJS({
                vote: {
-                   pair: ['Sunshine', 'Millions']
+                   pair: ['Sunshine', 'Millions'],
+                   round: 1
                },
                entries: ['127 Hours', 'Transplotting']
            }));
@@ -47,7 +48,8 @@ describe("application logic", () => {
            const nextState = next(state);
            expect(nextState).to.equal(Map({
                vote: Map({
-                   pair: List.of('Sunshine', 'Millions')
+                   pair: List.of('Sunshine', 'Millions'),
+                   round: 1
                }),
                entries: List.of('127 Hours', 'Trainspotting', '28 Days Later')
            }));

@@ -21,14 +21,16 @@ describe('reducer', () => {
 
     it('handle NEXT', () => {
         const initialState = fromJS({
-            entries: ['Transplotting', '28 Days Later']
+            entries: ['Transplotting', '28 Days Later'],
+
         });
         const action = {type: 'NEXT'};
         const nextState = reducer(initialState, action);
 
         expect(nextState).to.equal(fromJS({
             vote:{
-                pair: ['Transplotting', '28 Days Later']
+                pair: ['Transplotting', '28 Days Later'],
+                round: 1
             },
             entries: []
         }));

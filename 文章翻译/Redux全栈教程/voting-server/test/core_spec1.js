@@ -20,7 +20,8 @@ describe('application logic', () => {
             const nextState = next(state);
             expect(nextState).to.equal(Map({
                 vote: Map({
-                    pair: List.of('Transpotting', '28 Days Later')
+                    pair: List.of('Transpotting', '28 Days Later'),
+                    round: 1
                 }),
                 entries: List.of('Sunshine')
             }));

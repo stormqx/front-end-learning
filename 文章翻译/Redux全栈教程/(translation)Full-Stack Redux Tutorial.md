@@ -46,13 +46,13 @@ React+Redux构建。在我们的工具箱里还包括ES6,Babel,Socket.io,Webpack
   * [从服务端接收Actions](#Receiving_Actions_From_The_Server)
   * [从react组件分发Actions](#Dispatching_Actions_From_React_Component)
   * [使用Redux中间件向服务端发送Actions](#Sending_Actions_To_The_Server_Using_Redux_Middleware)
-* 练习
-  * 预防无效投票
-  * 改进投票state重置
-  * 预防重复投票
-  * 重新开始投票
-  * 指示套接字连接state
-  * 加分挑战：Going Peer To Peer
+* [练习](#exercises)
+  * [预防无效投票](#Invilid_Vote_Prevention)
+  * [改进投票state重置](#Improved_Vote_State_Reset)
+  * [预防重复投票](#Duplicate_Vote_Prevention)
+  * [重新开始投票](#Restarting_The_Vote)
+  * [指示套接字连接state](#Indicating_Socket_Connection_State)
+  * [加分挑战：Going Peer To Peer](#Bouns_Challenge_Going_Peer_To_Peer)
 
 <h3 id="What_You_Will_Need"> 你所需要的</h3>
 
@@ -4087,3 +4087,307 @@ export const ResultsContainer = connect(
 界面。你将会看到一个设备上的action将会立即影响另外一个设备。这是感觉神奇的一件事：在一个界面上进行投票，在
 另外一个界面上看到投票结果更新。点击投票结果界面上的"NEXT"按钮，并且在投票设备上观察投票进展。为了使它更有
 趣，下次与朋友一起的时候安排一次投票吧！
+
+<h3 id='exercises'> 练习</h3>
+
+如果你打算进一步开发这款app,同时可以进一步熟悉Redux architecture, 下面有一些练习。我已经贴上了每种练习的
+一种可能答案。
+
+<h4 id='Invilid_Vote_Prevention'>1. 预防无效投票</h3>
+如果投票的条目不在当前的条目对中，服务器应该拒绝该条目作出投票。添加一个失败的单元测试并且修复相关逻辑。
+
+下面是我编写的单元测试:
+```js
+// src/test/core_spec3.js
+
+import {List, Map} from 'immutable';
+import {expect} from 'chai';
+import {vote} from '../src/core';
+
+describe('application logic', () => {
+
+  //..
+
+  decribe('vote', () => {
+
+    it('tally won`t be added when voted entry isn`t included in the current pair', () => {
+      const state = Map({
+          pair: List.of('Transplotting', '28 Days Later'),
+          tally: Map({
+              'Transplotting': 3,
+              '28 Days Later': 2
+          })
+      });
+
+      const nextState = vote(state, 'Sunshine');
+
+      expect(nextState).to.equal(Map({
+          pair: List.of('Transplotting', '28 Days Later'),
+          tally: Map({
+              'Transplotting': 3,
+              '28 Days Later': 2
+          })
+      }));
+    });
+
+  });
+});
+```
+
+
+这是我的解决方法:
+```js
+// src/core.js
+
+export function vote(voteState, entry) {
+    const currentPair = voteState.get('pair');
+    if(currentPair.includes(entry)) {
+        return voteState.updateIn(
+            ['tally', entry],
+            0,
+            tally => tally+1
+        );
+    }
+    return voteState;
+}
+```
+在更新投票之前先判断currentPair中是否包含entry条目,如果包含的话再进行投票。
+
+原作者的解决思路和我一致，如果您感兴趣的话可以点击[Original author solution](https://github.com/teropa/redux-voting-server/commit/exercise-1)
+
+<h4 id='Improved_Vote_State_Reset'>2. 改进投票state重置</h3>
+
+目前的客户端应用程序重置 **hasVoted** 属性是在新的投票对中不包含 **hasVoted** 属性指定的条目时。这会造成一个问题：
+在投票的最后一个阶段，两个连续的条目对肯定包含相同的条目，这个时候 **hasVoted** 属性将不会被重置。用户在最后一轮不能
+作出投票操作，因为两个投票按钮都处于disabled.
+
+先说我的想法: 直接在客户端的 **resetVoted** 函数中添加逻辑判断是否当前state中的entries为空(如果为空，因为着这次投票
+处于最后环节，此时同样remove **hasVoted** 属性),代码如下：
+```js
+// src/reducer.js
+
+function resetVote(state) {
+    const hasVoted = state.get('hasVoted');
+    const currentPair = state.getIn(['vote', 'pair'], List());
+    const currentEntries = state.get('entries',List());
+    if(!currentEntries && currentEntries.isEmpty()) {
+        return state.remove('hasVoted');
+    } else if(hasVoted && !currentPair.includes(hasVoted)) {
+        return state.remove('hasVoted');
+    } else {
+        return state;
+    }
+}
+```
+
+首先，这种想法经过测试后发现是错的。我只考虑了最后一轮环节的初始情况，却没有考虑到这种方法实际上又使disabled功能失效了
+(因为vote action虽然set了hasVoted属性，但是action要发向server端的，server端dispatching Voting action后，通过
+socket向客户端发送state,客户端接收到后，dispatching setState方法，这时remove hasVoted属性...)。其次，这种想法我本
+人觉得这种做法非常愚蠢，因为它仅仅是为了处理一种特殊情况而增加新的逻辑判断，导致代码出现长串的if-else, 总感觉它不可扩展，
+但是暂时又没有想到反例:(
+
+---
+
+**接下来让我们下看看原作者的想法:**
+
+修改我们的系统使它在每轮投票中都创建一个unique identifier,并且投票状态通过追踪每轮的id进行更新。
+
+提示：在服务器端跟踪一个运行的轮次计数器。当用户进行投票操作时，将当前轮数保存在客户端状态中。当状态更新时，如果轮次数
+已改变，则重置 **hasVoted** 属性。
+
+
+我们在服务器端state中添加一个round属性，每轮对应的round不同。我们先编写相关单元测试：
+```js
+
+// src/test/core_spec5.js
+
+describe('next', () => {
+    it('add unique identifier', () => {
+
+        const state = fromJS({
+            vote: {
+                pair: ['Transplotting', '28 Days Later'],
+                round: 1,
+                tally: {
+                    'Transplotting': 4,
+                    '28 Days Later': 2
+                }
+            },
+            entries: ['Sunshine', 'Millions', '127 Hours']
+        });
+
+        const nextState = next(state);
+        expect(nextState).to.equal(fromJS({
+            vote: {
+                pair: ['Sunshine', 'Millions'],
+                round: 2
+            },
+            entries: ['127 Hours', 'Transplotting']
+
+        }));
+
+    });
+});
+```
+
+注意，由于我们添加了round属性，其他关于next函数的单元测试也需要同时修改：
+```js
+
+// src/test/core_spec1.js
+
+describe('application logic', () => {
+
+    //..
+
+    describe('next', () => {
+
+        it('take the next two entries under vote', () => {
+            const state = Map({
+                entries: List.of('Transpotting', '28 Days Later', 'Sunshine')
+            });
+            const nextState = next(state);
+            expect(nextState).to.equal(Map({
+                vote: Map({
+                    pair: List.of('Transpotting', '28 Days Later'),
+                    round: 1
+                }),
+                entries: List.of('Sunshine')
+            }));
+        });
+
+    });
+
+});
+```
+
+```js
+
+// src/test/core_spec4.js
+
+
+describe("application logic", () => {
+
+    //..
+
+   describe('winnerAndNext', () => {
+
+       it('put winner of current vote back to entries', () => {
+           const state = fromJS({
+               vote: {
+                   pair: ['Transplotting', '28 Days Later'],
+                   tally: {
+                       'Transplotting': 4,
+                       '28 Days Later': 2
+                   }
+               },
+               entries: ['Sunshine', 'Millions', '127 Hours']
+           });
+
+           const nextState = next(state);
+           expect(nextState).to.equal(fromJS({
+               vote: {
+                   pair: ['Sunshine', 'Millions'],
+                   round: 1
+               },
+               entries: ['127 Hours', 'Transplotting']
+           }));
+       });
+
+       it('puts both from tied vote back to entries', () => {
+           const state = Map({
+               vote: Map({
+                   pair: List.of('Trainspotting', '28 Days Later'),
+                   tally: Map({
+                       'Trainspotting': 3,
+                       '28 Days Later': 3
+                   })
+               }),
+               entries: List.of('Sunshine', 'Millions', '127 Hours')
+           });
+           const nextState = next(state);
+           expect(nextState).to.equal(Map({
+               vote: Map({
+                   pair: List.of('Sunshine', 'Millions'),
+                   round: 1
+               }),
+               entries: List.of('127 Hours', 'Trainspotting', '28 Days Later')
+           }));
+       });
+   });
+});
+```
+
+```js
+
+// src/test/reducer_spec.js
+
+describe('reducer', ()=> {
+    it('handle NEXT', () => {
+        const initialState = fromJS({
+            entries: ['Transplotting', '28 Days Later'],
+
+        });
+        const action = {type: 'NEXT'};
+        const nextState = reducer(initialState, action);
+
+        expect(nextState).to.equal(fromJS({
+            vote:{
+                pair: ['Transplotting', '28 Days Later'],
+                round: 1
+            },
+            entries: []
+        }));
+    });
+});
+```
+
+
+接下来我们修改服务器端 **next** 函数，在 **vote** 属性中添加了 **round** 属性。
+```js
+
+// src/core.js
+
+export function next(state) {
+    const entries = state.get('entries')
+        .concat(getWinners(state.get('vote')));
+    if (entries.size === 1) {
+        return state.remove('vote')
+            .remove('entries')
+            .set('winner', entries.first());
+    } else {
+        return state.merge({
+            vote: Map(
+                {pair: entries.take(2),
+                 round: state.getIn(['vote', 'round'], 0) + 1
+                }),
+            entries: entries.skip(2)
+        });
+    }
+}
+```
+
+然后我们对客户端进行修改。在这里，我修改了 **setState** 函数，它通过比对oldState和newState来判断
+时候去除 **hasVoted** 属性。
+```js
+// src/components/reducer.js
+
+function setState(state, newState) {
+    let mergedState = state.merge(newState);
+    const oldRound = state.getIn(['vote', 'round']);
+    const newRound = fromJS(newState).getIn(['vote', 'round']);
+    console.log(oldRound);
+    console.log(newRound);
+    if( mergedState.get('hasVoted') && oldRound !== newRound ) {
+        return mergedState.remove('hasVoted');
+    } else {
+        return mergedState;
+    }
+}
+```
+
+##### 注意：原作者的客户端程序写法与我的不同，你应该去理解下[原作者的写法](https://github.com/teropa/redux-voting-client/commit/exercise-2)
+
+<h4 id='Duplicate_Vote_Prevention'>3. 预防重复投票</h3>
+<h4 id='Restarting_The_Vote'>4. 重新开始投票</h3>
+<h4 id='Indicating_Socket_Connection_State'>5. 指示套接字连接state</h3>
+<h4 id='Bouns_Challenge_Going_Peer_To_Peer'>6. 加分挑战：Going Peer To Peer</h3>
