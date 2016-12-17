@@ -12,7 +12,8 @@ import {Provider} from 'react-redux';
 import reducer from './reducer';
 import {Router, Route, browserHistory} from 'react-router';
 import io from 'socket.io-client';
-import {setState} from './action_creators';
+import {setState, setClientId} from './action_creators';
+import getClientId from './client_id';
 import remoteActionMiddleware from './remote_action_middleware';
 
 
@@ -28,6 +29,7 @@ const createStoreWithMiddleware = applyMiddleware(
     remoteActionMiddleware(socket)
 )(createStore);
 const store = createStoreWithMiddleware(reducer);
+store.dispatch(setClientId(getClientId()));
 
 
 

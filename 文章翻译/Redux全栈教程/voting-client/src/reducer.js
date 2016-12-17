@@ -43,6 +43,8 @@ export default function reducer(state = Map(), action) {
             return resetVote(setState(state, action.state));
         case 'VOTE' :
             return vote(state, action.entry);
+        case 'SET_CLIENT_ID' :
+            return state.set('clientId', action.clientId);
     }
 
     return state;

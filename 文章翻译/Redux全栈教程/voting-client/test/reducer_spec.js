@@ -5,6 +5,7 @@
 import {List, Map, fromJS} from 'immutable';
 import {expect} from 'chai';
 import reducer from '../src/reducer';
+import {setClientId} from '../src/action_creators';
 
 describe('reducer', () => {
 
@@ -144,6 +145,17 @@ describe('reducer', () => {
 
         expect(countNum).to.equal(0);
         expect(isEqual).to.equal(true);
+    });
+
+    it('handle SET_CLIENT_ID', () => {
+
+        const initialState = Map();
+        const action = setClientId('1234');
+        const nextState = reducer(initialState, action);
+
+        expect(nextState).to.equal(Map({
+            clientId: '1234'
+        }));
     });
 
 });

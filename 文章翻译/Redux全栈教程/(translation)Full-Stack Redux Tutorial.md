@@ -4388,6 +4388,11 @@ function setState(state, newState) {
 ##### 注意：原作者的客户端程序写法与我的不同，你应该去理解下[原作者的写法](https://github.com/teropa/redux-voting-client/commit/exercise-2)
 
 <h4 id='Duplicate_Vote_Prevention'>3. 预防重复投票</h3>
+
+如果一个用户只刷新页面，则用户仍然可以在同一轮中投票多次，因为他们投票的状态丢失了。请你解决这个问题.
+
+提示：为每个用户生成唯一的标识符，并在服务器上追踪谁投票了什么内容。这样如果用户再次投票，他们对该轮投票的之前投票
+将被取消。如果这么做，你也可以跳过禁用投票按钮，因为用户可能在轮次间改变主意。
 <h4 id='Restarting_The_Vote'>4. 重新开始投票</h3>
 <h4 id='Indicating_Socket_Connection_State'>5. 指示套接字连接state</h3>
 <h4 id='Bouns_Challenge_Going_Peer_To_Peer'>6. 加分挑战：Going Peer To Peer</h3>
