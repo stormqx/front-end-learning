@@ -4394,6 +4394,189 @@ function setState(state, newState) {
 
 提示：为每个用户生成唯一的标识符，并在服务器上追踪谁投票了什么内容。这样如果用户再次投票，他们对该轮投票的之前投票
 将被取消。如果这么做，你也可以跳过禁用投票按钮，因为用户可能在轮次间改变主意。
+
+为了给每个用户生成唯一的标识符，我们在客户端安装uuid package:
+```sh
+npm install --save uuid
+```
+
+在每个客户端初始化后，我们为它设置唯一的标识符:
+```js
+// src/index.js
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import App from './components/App';
+import {VotingContainer} from './components/Voting';
+import {ResultsContainer} from './components/Results';
+import {createStore, applyMiddleware} from 'redux';
+import {Provider} from 'react-redux';
+import reducer from './reducer';
+import {Router, Route, browserHistory} from 'react-router';
+import io from 'socket.io-client';
+import {setState, setClientId} from './action_creators';
+import getClientId from './client_id';
+import remoteActionMiddleware from './remote_action_middleware';
+
+const socket = io(`${location.protocol}//${location.hostname}:8090`);
+socket.on('state', state =>
+    store.dispatch(setState(state))
+);
+
+const createStoreWithMiddleware = applyMiddleware(
+    remoteActionMiddleware(socket)
+)(createStore);
+const store = createStoreWithMiddleware(reducer);
+store.dispatch(setClientId(getClientId()));
+
+
+
+const appInstance = (
+    <Provider store={store}>
+      <Router history={browserHistory}>
+        <Route  component={App}>
+            <Route path="/" component={VotingContainer}/>
+            <Route path="/results" component={ResultsContainer}/>
+        </Route>
+      </Router>
+    </Provider>
+    );
+
+ReactDOM.render(
+    appInstance,
+    document.getElementById('app')
+);
+```
+
+其中 setClientId 为action。所以我们要修改action_creators.js:
+```js
+
+// src/action_creator.js
+
+ //..
+export function setClientId(clientId) {
+    return {
+        type: 'SET_CLIENT_ID',
+        clientId
+    }
+}
+```
+
+接下来，我们要完成获得客户端唯一标识符的部分，我们将uuid存放在localStorage中，每当客户端进行连接时读取
+localStorage获得clientId。创建一个名为 **client_id.js** 的文件:
+```js
+
+//src/client_id.js
+
+/**
+ * Created on 17/12/2016.
+ */
+
+import uuid from 'uuid';
+
+export default function getClientId() {
+    let id = localStorage.getItem('clientId');
+    if(!id) {
+        id = uuid.v4();
+        localStorage.setItem('clientId', id);
+    }
+    return id;
+}
+```
+
+我们现在有了 **setClientId** action, 接下来就是修改我们的reducer:
+```js
+
+//scr/reducer.js
+
+export default function reducer(state = Map(), action) {
+
+    switch (action.type) {
+        case 'SET_STATE' :
+            return resetVote(setState(state, action.state));
+        case 'VOTE' :
+            return vote(state, action.entry);
+        case 'SET_CLIENT_ID' :
+            return state.set('clientId', action.clientId);
+    }
+
+    return state;
+}
+```
+
+最后，别忘了修改 **remote_action_middleware**, 在每次向服务器端发送action时插入clientId:
+```js
+
+// src/remote_action_middleware.js
+
+export default socket => store => next => action => {
+    if(action.meta && action.meta.remote) {
+        const clientId = store.getState().get('clientId');
+        socket.emit('action',Object.assign({}, action, {clientId}));
+    }
+    return next(action);
+}
+```
+
+完成了客户端代码修改，我们将目光转移到服务器端。在服务器端我们只需要关注 **vote** action的处理过程,我们
+先去除该clientId之前的投票信息, 然后再进行重新计票。
+```js
+
+// src/reducer.js
+
+import {setEntries, next, vote, INITIAL_STATE} from './core'
+
+export default function reducer(state = INITIAL_STATE, action) {
+    //figure out which function to call and call it
+    switch (action.type) {
+        case 'SET_ENTRIES':
+            return setEntries(state, action.entries);
+        case 'NEXT':
+            return next(state);
+        case 'VOTE':
+            return state.update('vote',
+                                 voteState => vote(voteState, action.entry, action.clientId));
+    }
+    return state;
+}
+```
+
+```js
+
+// src/core.js
+
+//..
+
+function removePreviousVote(voteState, voter) {
+    const previousVote = voteState.getIn(['voters', voter]);
+    if(previousVote) {
+        return voteState.updateIn(['tally', previousVote], tally => tally-1)
+                        .removeIn(['voters',voter]);
+    }
+    return voteState;
+}
+
+function addVote(voteState, entry, voter) {
+    const currentPair = voteState.get('pair', List());
+    if(currentPair.includes(entry) && voter ) {
+        return voteState.updateIn(['tally', entry], 0, tally => tally+1)
+                        .setIn(['voters', voter], entry)
+    }
+    return voteState;
+}
+
+export function vote(voteState, entry, voter) {
+    return addVote(
+        removePreviousVote(voteState, voter),
+        entry,
+        voter
+    )
+}
+```
+
+最后, 别忘记了修改相关的单元测试代码哦！
+
+
 <h4 id='Restarting_The_Vote'>4. 重新开始投票</h3>
 <h4 id='Indicating_Socket_Connection_State'>5. 指示套接字连接state</h3>
 <h4 id='Bouns_Challenge_Going_Peer_To_Peer'>6. 加分挑战：Going Peer To Peer</h3>
