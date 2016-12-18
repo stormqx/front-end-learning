@@ -5,10 +5,10 @@
 import uuid from 'uuid';
 
 export default function getClientId() {
-    let id = localStorge.getItem('clientId');
+    let id = localStorage.getItem('clientId');
     if(!id) {
         id = uuid.v4();
-        localStorge.setItem('clientId', id);
+        localStorage.setItem('clientId', id);
     }
     return id;
 }
