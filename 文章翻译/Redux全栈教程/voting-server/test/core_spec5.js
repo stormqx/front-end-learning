@@ -32,10 +32,10 @@ describe('next', () => {
 
         const state = fromJS({
             vote: {
-                pair: ['Transplotting', '28 Days Later'],
+                pair: ['Trainspotting', '28 Days Later'],
                 round: 1,
                 tally: {
-                    'Transplotting': 4,
+                    'Trainspotting': 4,
                     '28 Days Later': 2
                 }
             },
@@ -48,7 +48,7 @@ describe('next', () => {
                 pair: ['Sunshine', 'Millions'],
                 round: 2
             },
-            entries: ['127 Hours', 'Transplotting']
+            entries: ['127 Hours', 'Trainspotting']
 
         }));
 

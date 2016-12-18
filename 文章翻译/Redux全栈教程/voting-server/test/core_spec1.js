@@ -15,12 +15,12 @@ describe('application logic', () => {
 
         it('take the next two entries under vote', () => {
             const state = Map({
-                entries: List.of('Transpotting', '28 Days Later', 'Sunshine')
+                entries: List.of('Trainspotting', '28 Days Later', 'Sunshine')
             });
             const nextState = next(state);
             expect(nextState).to.equal(Map({
                 vote: Map({
-                    pair: List.of('Transpotting', '28 Days Later'),
+                    pair: List.of('Trainspotting', '28 Days Later'),
                     round: 1
                 }),
                 entries: List.of('Sunshine')

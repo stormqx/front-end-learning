@@ -15,9 +15,9 @@ describe("application logic", () => {
        it('put winner of current vote back to entries', () => {
            const state = fromJS({
                vote: {
-                   pair: ['Transplotting', '28 Days Later'],
+                   pair: ['Trainspotting', '28 Days Later'],
                    tally: {
-                       'Transplotting': 4,
+                       'Trainspotting': 4,
                        '28 Days Later': 2
                    }
                },
@@ -30,7 +30,7 @@ describe("application logic", () => {
                    pair: ['Sunshine', 'Millions'],
                    round: 1
                },
-               entries: ['127 Hours', 'Transplotting']
+               entries: ['127 Hours', 'Trainspotting']
            }));
        });
 
