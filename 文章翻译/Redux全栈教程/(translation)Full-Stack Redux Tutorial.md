@@ -141,7 +141,7 @@ entry同样会被放在vote中。
 这看起来似乎是一种可行的设计。有很多不同的方法来设计这些要求的state，这可能不是最佳的。但是这并不重要。只需要在开始的时候足够好就行，
 重要的是我们已经建立了一种具体的应用程序该如何执行任务的想法。这是我们甚至没有考虑任何代码之前就完成的！
 
-<h3 id='Project_Setup)'> 项目安装</h3>
+<h3 id='Project_Setup'> 项目安装</h3>
 
 说了这么多废话，是时候开始干活了。在我们做任何事情之前，我们需要建立一个项目目录并且初始化它作为一个NPM项目：
 ```zsh
@@ -438,7 +438,7 @@ objects和数组可能会造成过量的复制，这会降低性能。
 在了解了immutable state trees和在树上进行操作的纯函数。我们可以将我们的注意力转移到投票系统的逻辑层上。应用程序
 的核心将由我们一直在讨论的部分组成：一个tree structure以及一些产生新版tree structure的函数。
 
-<h3 id="loading_entries"> 加载条目</h3>
+<h3 id="Loading_Entries"> 加载条目</h3>
 
 首先，正如我们前面所讨论的，应用程序允许"加载"一系列想要被投票的条目。我们应该有一个**setEntries**函数，它可以获取之
 前的state和一系列条目，生成一个包括所有条目的state,下面是相关的测试代码：
@@ -1161,7 +1161,8 @@ export default function reducer(state = INITIAL_STATE, action) {
 [Redux documentation for reducers](http://redux.js.org/docs/basics/Reducers.html)对于这种reducer
 组成的模式有着更详细的描述，并且还描述了一些在大多数情况下使reducer组合更容易的帮助函数。
 
-<h3 id='Introducing The Redux Store'> 介绍Redux Store</h3>
+<h3 id='Introducing_The_Redux_Store'> 介绍Redux Store</h3>
+
 现在我们有一个reduce, 接下来我们可以看看这是怎么插入Redux中的。
 
 正如我们所看到的，如果你拥有应用程序将要发生的所有action的集合, 你应该调用reduce。弹出应用程序的最终state。当然，
