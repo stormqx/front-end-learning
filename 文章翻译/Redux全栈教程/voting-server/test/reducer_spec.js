@@ -2,7 +2,7 @@
  * Created by qixin on 01/12/2016.
  */
 
-import {Map, fromJS} from 'immutable';
+import {List, Map, fromJS} from 'immutable';
 import {expect} from 'chai';
 
 import reducer from '../src/reducer';
@@ -15,7 +15,8 @@ describe('reducer', () => {
        const nextState = reducer(initialState, action);
 
        expect(nextState).to.equal(fromJS({
-           entries: ['Trainspotting', '28 Days Later']
+           entries: ['Trainspotting', '28 Days Later'],
+           originalEntries: ['Trainspotting', '28 Days Later']
        }));
     });
 

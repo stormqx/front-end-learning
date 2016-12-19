@@ -21,12 +21,19 @@ export function next() {
     return {
         meta: {remote: true},
         type: 'NEXT'
-    }
+    };
 }
 
 export function setClientId(clientId) {
     return {
         type: 'SET_CLIENT_ID',
         clientId
-    }
+    };
+}
+
+export function reset() {
+    return {
+        meta: {remote: true},
+        type: 'RESET'
+    };
 }

@@ -44,6 +44,11 @@ export class Results extends React.PureComponent {
                             onClick={this.props.next}>
                         Next
                     </button>
+                    <button
+                            className="reset"
+                            onClick={this.props.reset}>
+                        Reset
+                    </button>
                 </div>
             </div>
         );

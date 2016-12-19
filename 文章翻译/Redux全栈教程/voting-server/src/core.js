@@ -8,7 +8,8 @@ export const INITIAL_STATE = Map();
 
 
 export function setEntries(state, entries) {
-    return state.set('entries', List(entries));
+    return state.set('entries', List(entries))
+                .set('originalEntries', List(entries));
 }
 
 export function next(state) {
@@ -17,6 +18,7 @@ export function next(state) {
     if (entries.size === 1) {
         return state.remove('vote')
             .remove('entries')
+            .remove('originalEntries')
             .set('winner', entries.first());
     } else {
         return state.merge({
@@ -63,4 +65,12 @@ function getWinners(vote) {
     if      (aVotes > bVotes)  return [a];
     else if (aVotes < bVotes)  return [b];
     else                       return [a, b];
+}
+
+export function reset(state) {
+    const originalEntries = state.get('originalEntries');
+    return Map({
+        'entries': originalEntries,
+        'originalEntries': originalEntries
+    });
 }

@@ -15,7 +15,8 @@ describe('reducer', () => {
         const nextState = reducer(undefined, action);
 
         expect(nextState).to.equal(fromJS({
-            entries: ['Trainspotting']
+            entries: ['Trainspotting'],
+            originalEntries: ['Trainspotting']
         }));
     });
 });

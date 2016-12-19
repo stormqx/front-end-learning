@@ -1563,7 +1563,7 @@ npm install -g webpack webpack-dev-server
 ```js
 // webpack.config.js
 
-module.export ={
+module.exports ={
 
     entry: ['./src/index.js'],
 
@@ -4578,5 +4578,10 @@ export function vote(voteState, entry, voter) {
 
 
 <h4 id='Restarting_The_Vote'>4. 重新开始投票</h3>
+
+在结果页面实现一个按钮允许用户从头开始投票。
+
+提示: 你需要track状态中的原始条目，并将他们重置回去。
+
 <h4 id='Indicating_Socket_Connection_State'>5. 指示套接字连接state</h3>
 <h4 id='Bouns_Challenge_Going_Peer_To_Peer'>6. 加分挑战：Going Peer To Peer</h3>

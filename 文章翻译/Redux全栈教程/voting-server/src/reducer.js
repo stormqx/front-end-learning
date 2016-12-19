@@ -1,7 +1,7 @@
 /**
  * Created by qixin on 01/12/2016.
  */
-import {setEntries, next, vote, INITIAL_STATE} from './core'
+import {setEntries, next, vote, reset, INITIAL_STATE} from './core'
 
 export default function reducer(state = INITIAL_STATE, action) {
     //figure out which function to call and call it
@@ -13,6 +13,10 @@ export default function reducer(state = INITIAL_STATE, action) {
         case 'VOTE':
             return state.update('vote',
                                  voteState => vote(voteState, action.entry, action.clientId));
+        case 'RESET':
+            const originalState = reset(state);
+            return next(originalState);
+
     }
     return state;
 }

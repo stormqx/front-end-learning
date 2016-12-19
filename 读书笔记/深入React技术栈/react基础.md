@@ -21,8 +21,8 @@ function Button({ color = 'blue', text = 'comfirm' }) {
 }
 
 ```
-stateless function只传入 props 和 context 两个参数，不存在state,没有生命周期方法。它创建时始终保持了一个实例，
-避免了不必要的检查和内存分配，做到了内部优化。
+现在官方颇为推崇这种写法。stateless function只传入 props 和 context 两个参数，不存在state,没有生命周期方法。
+它创建时始终保持了一个实例，避免了不必要的检查和内存分配，做到了内部优化。
 
 setState是异步方法，一个生命周期内所有的setState方法会合并操作。
 
