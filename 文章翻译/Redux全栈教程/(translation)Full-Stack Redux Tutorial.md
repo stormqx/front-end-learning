@@ -4719,6 +4719,8 @@ export default function reducer(state = INITIAL_STATE, action) {
 最后，别忘了修改关于reducer和core的相关单元测试代码！
 
 <h4 id='Indicating_Socket_Connection_State'>5. 指示套接字连接state</h3>
-
 当连接不稳定时，Socket.io可能不会总是立即相连接。我们需要添加可视指示器来通知用户为连接。
+
+提示：监听来自socket.io的连接事件，并且在Redux store中分发设置connection state的action.
+
 <h4 id='Bouns_Challenge_Going_Peer_To_Peer'>6. 加分挑战：Going Peer To Peer</h3>

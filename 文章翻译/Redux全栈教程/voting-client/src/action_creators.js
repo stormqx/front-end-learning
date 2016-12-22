@@ -37,3 +37,11 @@ export function reset() {
         type: 'RESET'
     };
 }
+
+export function setConnectionState(state, connected) {
+    return {
+        type: 'SET_CONNECTION_STATE',
+        state,
+        connected
+    };
+}

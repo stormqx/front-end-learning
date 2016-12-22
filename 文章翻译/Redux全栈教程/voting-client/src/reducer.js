@@ -4,6 +4,13 @@
 
 import {List, Map, fromJS} from 'immutable';
 
+function setConnectionState(state, connectionState, connected) {
+    return state.set('connection', Map({
+        state: connectionState,
+        connected
+    }));
+}
+
 function setState(state, newState) {
     let mergedState = state.merge(newState);
     const oldRound = state.getIn(['vote', 'round']);
@@ -45,6 +52,8 @@ export default function reducer(state = Map(), action) {
             return vote(state, action.entry);
         case 'SET_CLIENT_ID' :
             return state.set('clientId', action.clientId);
+        case 'SET_CONNECTION_STATE' :
+            return setConnectionState(state, action.state, action.connected)
     }
 
     return state;
