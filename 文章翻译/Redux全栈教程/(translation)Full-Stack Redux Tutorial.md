@@ -1784,6 +1784,8 @@ npm install --save-dev react-hot-loader
 ```js
 // webpack.config.js
 
+var webpack = require('webpack');
+
 module.exports ={
 
     entry: [
@@ -4583,5 +4585,140 @@ export function vote(voteState, entry, voter) {
 
 提示: 你需要track状态中的原始条目，并将他们重置回去。
 
+我们着眼于客户端代码的修改，先在action_creator.js中添加生成reset action的相关代码。
+```js
+// src/action_creator.js
+
+function reset() {
+    return {
+        meta: {remote: true},
+        type: 'RESET'
+    };
+}
+```
+
+我们还要在result界面中添加reset按钮，并且保持onClick事件为reset.
+```js
+// src/component/Result.jsx
+
+export class Results extends React.PureComponent {
+    constructor(props) {
+        super(props);
+        this.getPair = this.getPair.bind(this);
+        this.getVotes = this.getVotes.bind(this);
+    }
+
+    getPair() {
+        return this.props.pair || [];
+    }
+
+    getVotes(entry) {
+        if(this.props.tally && this.props.tally.has(entry)) {
+            return this.props.tally.get(entry);
+        }
+        return 0;
+    }
+
+    render() {
+        return (
+            this.props.winner ?
+            <Winner ref="winner" winner = {this.props.winner} /> :
+            <div className="results">
+                {this.getPair().map( (entry, index) =>
+                    <div key={index} className="entry">
+                        <h1>{entry}</h1>
+                        <div className="voteCount">
+                            {this.getVotes(entry)}
+                        </div>
+                    </div>
+                )}
+                <div className="management">
+                    <button ref="next"
+                            className="next"
+                            onClick={this.props.next}>
+                        Next
+                    </button>
+                    <button
+                            className="reset"
+                            onClick={this.props.reset}>
+                        Reset
+                    </button>
+                </div>
+            </div>
+        );
+    }
+}
+```
+
+接下来我们开始考虑服务器端的部分，我们在state中添加了一项originalEntries,一旦reset action被分发，
+服务器端将state重置为originalEntries。注意重置完成后，我们要手动调用一次next action,再次将state
+回到初始状态。
+```js
+// src/core.js
+
+export function setEntries(state, entries) {
+    return state.set('entries', List(entries))
+                .set('originalEntries', List(entries));
+}
+
+export function next(state) {
+    const entries = state.get('entries')
+        .concat(getWinners(state.get('vote')));
+    if (entries.size === 1) {
+        return state.remove('vote')
+            .remove('entries')
+            .remove('originalEntries')
+            .set('winner', entries.first());
+    } else {
+        return state.merge({
+            vote: Map(
+                {pair: entries.take(2),
+                 round: state.getIn(['vote', 'round'], 0) + 1
+                }),
+            entries: entries.skip(2)
+        });
+    }
+}
+
+export function reset(state) {
+    const originalEntries = state.get('originalEntries');
+    return Map({
+        'entries': originalEntries,
+        'originalEntries': originalEntries
+    });
+}
+```
+我们要在setEntries方法中添加设置originalEntries的动作，同时在next方法中，若entries.size === 1
+我们还要移除掉'originalEntries' state, 在reset方法中，我们使用originalEntries将state重置。
+
+接下来，我们要修改reducer.js, 添加处理RESET action的情况。
+```js
+// src/reducer.js
+
+import {setEntries, next, vote, reset, INITIAL_STATE} from './core'
+
+export default function reducer(state = INITIAL_STATE, action) {
+    //figure out which function to call and call it
+    switch (action.type) {
+        case 'SET_ENTRIES':
+            return setEntries(state, action.entries);
+        case 'NEXT':
+            return next(state);
+        case 'VOTE':
+            return state.update('vote',
+                                 voteState => vote(voteState, action.entry, action.clientId));
+        case 'RESET':
+            const originalState = reset(state);
+            return next(originalState);
+
+    }
+    return state;
+}
+```
+
+最后，别忘了修改关于reducer和core的相关单元测试代码！
+
 <h4 id='Indicating_Socket_Connection_State'>5. 指示套接字连接state</h3>
+
+当连接不稳定时，Socket.io可能不会总是立即相连接。我们需要添加可视指示器来通知用户为连接。
 <h4 id='Bouns_Challenge_Going_Peer_To_Peer'>6. 加分挑战：Going Peer To Peer</h3>
