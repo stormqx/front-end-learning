@@ -1,3 +1,5 @@
+#qu
+
 #JSX延展属性
 
 我们可以使用延展属性，将一个对象所有的属性复制到另一个对象上。我们可以多次使用，或者和普通的属性一起用，不过要注意顺序，后面的会覆盖前面的。这是React直接支持的。
@@ -60,4 +62,81 @@ js中类方法不会默认绑定，如果忘记绑定传递给`onClick`事件的
 #List and Key
 当创建List元素时，我们需要包含一个唯一字符串标识的key属性。Key可以帮助React识别哪些元素被改变、添加或移除。如果没有stable IDs我们可以使用index作为key。但是并不推荐这样做，因为它会[变慢](https://facebook.github.io/react/docs/reconciliation.html#recursing-on-children)。
 
-Key并不需要全局唯一，当生成两个不同的数组时可以使用相同的key值。
+Key并不需要全局唯一，当生成两个不同的数组时可以使用相同的key值。Key值只是为React服务并不会通过组件传递，如果在组件里面同学需要这些值，你应该使用其他名字传props.
+#Form
+## 可控组件
+将用户输入操作和`setState()`相结合,让React state成为‘single source of truth‘，这样渲染表单的React组件还可以控制后续用户的输入时表单发生的情况。这类组件称为可控组件。
+
+`input`, `textarea`, `select`都可以接受`value`属性来实现可控组件。
+
+在HTML中，textarea的值被定义在标签中间，React中则定义在value上。
+
+`select`标签中可以添加`option`标签实现下拉菜单，其中所选项不是在`option`标签中设置`selected`，而是在`select`根标签设置`value`值。这在可控组件中更方便的，只需要在一个地方进行更新操作。
+
+## 不可控组件
+在可控组件中，我们需要为数据可能更改的每种方式都要编写事件处理程序，并且组件要管理所有的输入state。当我们把已存在的代码转换成React或者React应用程序与非React库集成时，可控组件会很麻烦。
+
+在不可控组件中，数据处理交给DOM本身而不是React组件。不为每个state变化写事件处理，而是使用[ref](https://facebook.github.io/react/docs/refs-and-the-dom.html)从DOM中获得数据。
+
+实际上，不可控组件类似于传统HTML表单输入，它会记住你所输入的，可以使用ref获得值。组件有`defaultValue`属性来满足不可控组件的默认值。
+
+```js
+class Form extends Component {
+  handleSubmitClick = () => {
+    const name = this._name.value;
+    // do something with `name`
+  }
+
+  render() {
+    return (
+      <div>
+        <input type="text" ref={input => this._name = input} />
+        <button onClick={this.handleSubmitClick}>Sign up</button>
+      </div>
+    );
+  }
+}
+```
+
+**不可控组件，当你需要数据时，你必须自己把数据pull下来。**
+
+**可控组件，是将数据改变push到表单组件中，所以可以实时改变**。  [link](http://goshakkk.name/controlled-vs-uncontrolled-inputs-react/)
+
+#Lifting State Up
+如果某些组件会对相同的数据变化做出响应，推荐将共享的state提到离他们最近的祖先上。
+
+#Composition vs Inheritance
+##Containment
+类似于`Sidebar`和`Dialog`这类组件事先不知道子组件是很普通的。可以使用`children` prop直接将子组件输出。
+
+更少见的情况，有时你在一个组件内部需要多个'holes'来填充内容。这种情况下，我们将子组件作为属性进行传递。
+
+```js
+function SplitPane(props) {
+  return (
+    <div className="SplitPane">
+      <div className="SplitPane-left">
+        {props.left}
+      </div>
+      <div className="SplitPane-right">
+        {props.right}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <SplitPane
+      left={
+        <Contacts />
+      }
+      right={
+        <Chat />
+      } />
+  );
+}
+```
+
+我们可以通过向组件传递属性来达到继承的效果，使用组合代替继承更具有灵活性。
+
