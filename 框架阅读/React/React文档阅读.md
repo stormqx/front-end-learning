@@ -324,7 +324,211 @@ function updateColorMap(colormap) {
   return {...colormap, right: 'blue'};
 }
 ```
-##Mixins
+## Mixins
 ES6发布没有任何mixin支持，所以使用ES6类来编写React是不支持mixin的，此外使用mixin会有一些问题，不要使用它。
-##React Without JSX
+## React Without JSX
 如果你不想在构建环境中添加babel等编译器，你可以不使用JSX语法糖。使用`React.createElement(component,props, ...children)`.
+
+## Reconciliation
+普通的[生成最小操作次数的树转换方法](http://grfia.dlsi.ua.es/ml/algorithms/references/editsurvey_bille.pdf)复杂度为O(n^3 ).
+React基于两个假设实现启发式的O(n)算法:
+ 
+1. 不同类型的元素将产生不同的树。
+2. 开发人员可以使用`key`属性指出在不同渲染中哪些元素是稳定的。
+
+### The Diffing Algorithm
+当diff两颗树时，React先根据root元素类型来比较两个root元素。
+
+#### ELement of Different Types
+当两个root元素是不同类型，React将会拆除旧树，然后从头建立一棵新树。当旧树被拆除时，旧树的DOM节点会被销毁，组件实例会调用`componentWillUnmount`函数。新树会被插入DOM中。组件实例会调用`componentWillMount`和`componentDidMount`函数。任何与旧树有关的状态会丢失。
+
+#### DOM Element of The Same Type
+当比较的两个DOM元素是相同类型的，React将会查看两者的属性，保留相同的底层DOM节点，只更新变化的属性。
+
+#### Component Elements of The Same Type 
+当一个组件更新时，组件实例是相同的，所以在不同渲染中的state被保留。React更新匹配的底层组件实例的属性，调用`componentWillReceiveProps`和`componentWillUpdate`函数。
+
+#### Recursing On Children
+默认情况下，当在DOM节点的孩子节点中递归时，React是同时在相对应的孩子节点中迭代更新变化的部分。
+
+```js
+<ul>
+  <li>Duke</li>
+  <li>Villanova</li>
+</ul>
+
+<ul>
+  <li>Connecticut</li>
+  <li>Duke</li>
+  <li>Villanova</li>
+</ul>
+```
+上面的例子会重新render所有的孩子节点，它不会意识到`<li>Duke</li>`和`<li>Villanova</li>`是应该保留的。这种不效率将成为一个问题。
+
+#### Keys
+
+为了解决上面的问题，React支持了一个`key `属性。当children有键值后，react会使用键值来匹配两颗树的children.
+
+```js
+<ul>
+  <li key="2015">Duke</li>
+  <li key="2016">Villanova</li>
+</ul>
+
+<ul>
+  <li key="2014">Connecticut</li>
+  <li key="2015">Duke</li>
+  <li key="2016">Villanova</li>
+</ul>
+```
+现在React就知道键值为'2014'的元素是新加的，键值为'2015'和'2016'的元素被移动了。
+key属性只需要在兄弟节点中是唯一的就足够了，不需要在全局状态下唯一。
+
+当然，如果使用数组的index作为`key`的话，只有在item没有被重排序的情况下才会高效，否则重渲染也会很慢。
+
+#### Tradeoffs(权衡) 
+现在的reconciliation算法实现，你只能表达一颗子树在它的兄弟节点中移动，但不能表达它被移动到了别处，后者会重新算然整颗树。
+
+因为React是启发式的，如果它背后假设的条件没有得到满足，性能将会受损。
+
+1. 算法不会试着去匹配两个不同组件类型的子树。如果你发现两个不同类型的组件有着相似的输出后，打算使用相同的类型。我们发现这并不是一个问题。
+2. `key`要是稳定的、局部唯一、可预测的。如果你使用不稳定的`key`(比如`math.random()`)会造成性能损失和state丢失。(因为dom节点可能会被重新渲染)
+
+## Context
+有些时候，你打算在组件树中传数据，但又不想在每一级上使用`props`,你可以直接调用react强大的`context` API.
+
+### Why Not to Use Context
+* 如果你想要应用程序是稳定的，不要使用context。它是一个试验性的API，可能在react后版本中被废弃。
+* 如果你不还熟悉状态管理库(比如[Redux](https://github.com/reactjs/redux)和[MobX](https://github.com/mobxjs/mobx))，不要使用context。对于许多实际的项目，这些库和它们对react的绑定是管理组件state的不错选择。很可能Redux是解决问题的正确方案，而不是context。
+* 如果你不是一个react老司机，不要用context。使用`porps`和`state`来实现功能是更好的选择。
+* 如果你还是想用context.你应该将使用context隔离到一个小区域。当API变化时更容易升级。
+
+### How To Use Context
+假设有一段下列代码：
+
+```js
+class Button extends React.Component {
+  render() {
+    return (
+      <button style={{background: this.props.color}}>
+        {this.props.children}
+      </button>
+    );
+  }
+}
+
+class Message extends React.Component {
+  render() {
+    return (
+      <div>
+        {this.props.text} <Button color={this.props.color}>Delete</Button>
+      </div>
+    );
+  }
+}
+
+class MessageList extends React.Component {
+  render() {
+    const color = "purple";
+    const children = this.props.messages.map((message) =>
+      <Message text={message.text} color={color} />
+    );
+    return <div>{children}</div>;
+  }
+}
+```
+上例中，我们按照`Button`和`Message`的顺序手动传递了`color`属性。使用`context`,我们可以通过组件树自动传递：
+
+```js
+class Buttion extends React.Component {
+  render() {
+    return (
+      <button style={{background: this.context.color}}>
+      </button>
+    );
+  }
+}
+
+Button.contextTypes = {
+  color: React.PropTypes.string
+};
+
+class Message extends React.Component {
+  render() {
+    <div>
+     {this.props.text}<Button>Delete</Button>
+    </div>
+  }
+}
+
+class MessageList extends React.Component {
+  getChildContext() {
+    return {color: "purple"};
+  }
+  
+  render() {
+    const children = this.props.messages.map((message) => <Message text={message.text}/>
+    );
+    return <div>{children}</div>;
+  }
+}
+
+MessageList.childContextTypes = {
+  color: React.PropsTypes.string
+};
+```
+通过向context provider添加`childContextTypes`和`getChildContext`，react会自动向下传递信息并且子树中的任何组件都可以通过定义`contextTypes`来访问它。
+
+如果`contextTypes`没有定义，`context`将会是空对象。
+
+### Parent-Child Coupling
+context可以建立父子组件交流的API.比如[React Router V4](https://react-router.now.sh/basic)就是以这种方式工作：
+
+```js
+const BasicExample = () => (
+  <Router>
+    <div>
+      <ul>
+        <li><Link to="/">Home</Link></li>
+        <li><Link to="/about">About</Link></li>
+        <li><Link to="/topics">Topics</Link></li>
+      </ul>
+
+      <hr/>
+
+      <Match exactly pattern="/" component={Home} />
+      <Match pattern="/about" component={About} />
+      <Match pattern="/topics" component={Topics} />
+    </div>
+  </Router>
+)
+```
+通过从`Router`组件向下传递一些信息，每一个`Link`和`Match`可以和`Router`交流。(没怎么懂。 TODO：看react router源码)
+
+### Referencing Context in Lifecycle Methods
+如果组件定义了`contextTypes`,下列的生命周期方法将会接受一个`context`参数：
+
+* `constructor(props, context)`
+* `componentWillReceiveProps(nextProps, nextContext`
+* `shouldComponentUpdate(nextProps, nextState, nextContext)`
+* `componentWillUpdate(nextProps, nextState, nextContext)`
+* `componentDidUpdate(prevProps, prevState, prevContext)`
+
+### Referencing Context in Stateless Functional Components
+无状态函数组件如果定义了`contextTypes`可以接受一个`context`参数。
+
+```js
+const Button = ({children}, context) =>
+  <button style={{background: context.color}}>
+    {children}
+  </button>;
+
+Button.contextTypes = {color: React.PropTypes.string};
+```
+
+react有API来更新context,但是官方文档义正严辞的强调不要使用它- - 。。。因为如果你打算从root组件中通过`setState`来改变context中的内容，然后传递变化后的值给后代组件更新后代组件。如果中间组件是`shouldComponentUpdate`返回了`false`，后代组件并不会更新。
+
+## Higher-Order Components
+HOC组件是一个函数，它接收一个组件然后返回一个新组件。
+
+(TODO: 这块目前没接触过，先留着。)
