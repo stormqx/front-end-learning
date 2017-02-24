@@ -221,6 +221,8 @@ function Story(props) {
 * 当`ref`属性被用于HTML元素中，`ref`回调函数接收底层的DOM元素作为它的参数。**使用`ref`回调函数可以存储一个DOM元素的引用**。
 * 当`ref`属性被用于自定义组件时，`ref`回调函数接收mounted的组件实例作为它的参数。
 
+目前使用`ref`属性应该采用回调函数的方式，旧版的react 可能会出现 String `ref`, 以后不要这么使用，String `ref`存在bug.
+
 ##Optimizing Performance
 使用生产环境构建，对于Webpack来说，在生产config文件中添加插件。因为在开发环境构建包括了一些帮助写app的warning。
 
