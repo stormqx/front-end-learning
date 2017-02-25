@@ -411,5 +411,8 @@ console.log(5);
 	
 	如果你看了上面的`inner()`Promise 和`outer()` Promise的话，在`executor`函数中会先log出2，接下来运行`resolve()`函数，因为此时没有任何`.then()` handler附加，所以会继续运行`executor`函数log出3.
 
-* **先log出5，在log出4**
+* **先log出5，再log出4**
    当log出3之后，Promise返回然后调用`.then()` handler,但是它不会立即执行`.then()` handler, 而是将它放入队列中，当堆栈解开到只有平台代码(platform code)时，所有`.then()`处理程序才会被异步调用。所以会先log出5，接下来没有任何同步代码，会执行队列中的`.then()`函数。
+   
+* **为什么先log出4，再log出1**
+	是因为 原生的`Promise.then()`里面的回调属于 microtask, 会在当前 Event Loop 的最后执行, 而 SetTimeout 内的回调属于 macrotask, 会在下一个 Event Loop 中执行.(TODO: 认真研究Event Loop)
