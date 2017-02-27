@@ -73,7 +73,31 @@ Key并不需要全局唯一，当生成两个不同的数组时可以使用相�
 
 `select`标签中可以添加`option`标签实现下拉菜单，其中所选项不是在`option`标签中设置`selected`，而是在`select`根标签设置`value`值。这在可控组件中更方便的，只需要在一个地方进行更新操作。
 
+#### React可控组件更新state的流程:
+ 1. 可以通过在初始state中设置表单的默认值。
+ 2. 当表单的值发生变化时，调用onChange事件处理器。
+ 3. 事件处理器通过合成对象e拿到改变后的状态，并更新应用的state.
+ 4. setState触发视图的重新渲染，完成组件更新.
+
+当然，受控组件有个头疼的问题：每个组件都要绑定一个change事件。。。简单情况下，我们可以用一个事件处理器来处理多个表单域：
+
+```js
+handleChange(name, e) {
+  const { value } = e.target;
+  //这里只能处理直接赋值这种简单的情况，复杂的处理建议使用switch。
+  this.setState({
+     [name]: value,
+  })
+}
+
+<input value={name} onChange={this.handleChange.bind(this, 'name')}/>
+<input value={age} onChange={this.handleChange.bind(this, 'age')}/>
+```
+
 ### 不可控组件
+
+> 通俗的讲，如果一个表单组件没有value props(单选按钮和复选按钮对应的是checked prop)时，就可以被称为不可控组件。
+
 在可控组件中，我们需要为数据可能更改的每种方式都要编写事件处理程序，并且组件要管理所有的输入state。当我们把已存在的代码转换成React或者React应用程序与非React库集成时，可控组件会很麻烦。
 
 在不可控组件中，数据处理交给DOM本身而不是React组件。不为每个state变化写事件处理，而是使用[ref](https://facebook.github.io/react/docs/refs-and-the-dom.html)从DOM中获得数据。
