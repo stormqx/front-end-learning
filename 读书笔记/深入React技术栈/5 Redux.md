@@ -214,5 +214,110 @@ const logger = store => next => action => {
 
 TODO: 这里讲的太深了，先跳过。实际中需要学习异步时再看。
 
+## React Router
 
+![react router](images/React Router流程图.png)
 
+### React router的特性
+
+回想一下，在React中，组件就是一个方法，props可以看作方法的参数，当props发生变化时会触发方法执行，进而帮助我们重绘View。同理，在React Router中，我们可以把Router组件看成一个方法，location作为参数，返回的结果同样是组件。
+
+![react router与react对比](images/React Router与React对比.png)
+
+路由切换一般使用hashChange或者history.pushState. hashChange拥有良好的浏览器兼容性，但是url中多了`/#/`部分。history.pushState方法可以提供优雅的url,却需要额外的服务器配置解决任意路径刷新的问题。这对应了react router中的hashHistory和browserHistory.
+
+## React与组件
+
+### Redux中的组件
+
+|  | 展示型组件 | 容器型组件 |
+| ------| ------ | ------ |
+| 目的| 长什么样子（标签，样式等）| 干什么用（获取数据，更新状态等） |
+| 是否感知Redux | 否 | 是 |
+| 获取数据 | 从this.props中获取 | 使用connect从Redux状态树中获取 |
+| 改变数据 | 调用从porps中传入的action creator | 直接分发任何action |
+| 实际创建于 | 开发者自身 | 通常由React Redux创建 |
+
+* 容器型组件： 表达数据是怎么更新的。如果映射到Flux上，那么容器型组件就是与store绑定的组件。如果映射到Redux上，那么容器型组件就是使用connect的组件。
+* 展示型组件： 表达组件是怎么渲染的。包含了virtual DOM的修改和组合，也可能包含组件的样式。
+
+作区分的目的是为了使用相同的展示型组件配合不同的数据源做渲染，达到更好的复用性。
+
+### 布局组件的分类
+
+在Redux中，强调了三种不同类型的布局组件： Layouts, Views和Components.
+
+#### Layouts
+
+一般指页面布局组件，描述页面的基本结构，将主框架和页面主体分离。它一般就是设置在最外层Route的component中。
+
+```js
+
+const Layout = ({ children }) => (
+  <div className='container'>
+    <Header/>
+    <div className='content'>
+      {children}
+    </div>
+  </div>
+);
+```
+
+#### views
+
+views指的是子路由入口组件，描述了子路由入口的基本结构，包含了此路由下所有的展示型组件。
+
+```js
+
+@connect((state) => {
+  //...
+})
+
+class HomeView extends Compoent {
+  render() {
+    const { sth, changeType } = this.props;
+    const cardProps = { sth, changeType };
+    
+    return (
+      <div className="page page-home">
+        <Card {...cardProps} />
+      </div> 
+    );
+  }
+}
+
+```
+
+#### Components
+
+components就是末级渲染组件，描述了从路由以下的子组件。包含了具体的业务逻辑和交互。由于所有的数据和action是从views传下来的，这意味着它们是可以完全脱离数据层而存在的展示型组件。
+
+```js
+
+class Card extends Component {
+  constructor(props) {
+    super(props);
+    
+    this.handleChange = this.handleChange.bind(this);
+  }
+  
+  handleChange(opts) {
+    const { type } = opts;
+    
+    this.props.changeType(type);
+  }
+  
+  render() {
+    const { sth } = this.props;
+    
+    return (
+      <div className="mod-card">
+        <Switch onChange={this.handleChange}>
+          //...
+        </Switch>
+        {sth}
+      </div>
+    );
+  }
+}
+```
