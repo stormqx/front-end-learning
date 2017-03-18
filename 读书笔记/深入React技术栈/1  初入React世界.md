@@ -56,6 +56,8 @@ componentWillUnmount方法中，会执行清除方法，如事件回收或清除
 ###  componentWillUpdate
 ` componentWillUpdate`函数中不可以使用`this.setState`方法，这会造成循环调用，直至耗光浏览器内存后崩溃。如果我们需要更新`state`来响应某个`props`的改变，需要使用`componentWillReceiveProps`函数。
 
+### forceUpdate
+当你的`render`函数依赖一些其他的数据(除了`props`和`state`)时可以使用`forceUpdate`来重渲染。调用一个组件的`forceUpdate`方法会直接跳过该组件的`shouldComponentUpdate`方法，但是子组件的生命周期方法还是会正常被触发（包括子组件的`shouldComponentupdate`方法）.
 ##组件设计视角
 
 组件设计有两种常见的视角。拿Tabs组件为例。
