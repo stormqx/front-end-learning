@@ -99,6 +99,34 @@ Array.prototype.quick_sort = function () {
         .concat(this.filter(x => x >  pivot).quick_sort());
 };
 
+// 给Array.prototype添加bubble_sort方法
+Array.prototype.bubbleSort = function() {
+    var done = false;
+    while (!done) {
+        done = true;
+        for (var i = 1; i<this.length; i++) {
+            if (this[i-1] > this[i]) {
+                done = false;
+                [this[i-1], this[i]] = [this[i], this[i-1]]
+            }
+        }
+    }
+    return this;
+}
+
+Array.prototype.bubbleSort1 = function () {
+    var done = false;
+    for(var i=0; done==false && i<this.length; i++) {
+        done=true;
+        for(var j=0; j<this.length-i; j++) {
+            if(this[j]>this[j+1]) {
+                done = false;
+                [this[j], this[j+1]] = [this[j+1], this[j]];
+            }
+        }
+    }
+    return this;
+}
 
 
 
