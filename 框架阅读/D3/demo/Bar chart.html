@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>bar chart</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.8.0/d3.js"></script>
+    <style>
+        .chartWrap {
+            margin: 0 auto;
+            width: 1000px;
+        }
+        .chart rect {
+            fill: steelblue;
+        }
+
+        .chart text {
+            fill: white;
+            font: 10px sans-serif;
+            text-anchor: end;
+        }
+
+        .bar:hover {
+            fill: brown;
+        }
+
+        .axis text {
+            font: 10px sans-serif;
+            fill: black;
+        }
+
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #000;
+            shape-rendering: crispEdges;
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="chartWrap">
+        <svg class="chart"></svg>
+    </div>
+    <script>
+
+        const margin = {top: 20, right: 30, bottom: 30, left: 40},
+            width = 960 - margin.left - margin.right,
+            height = 500 - margin.top - margin.bottom;
+        const data = [
+            { name: 'A', value: 1, },
+            { name: 'B', value: 2, },
+            { name: 'C', value: 18, },
+            { name: 'D', value: 4, },
+            { name: 'E', value: 30, },
+            { name: 'F', value: 45, },
+            { name: 'G', value: 32, },
+            { name: 'H', value: 19, },
+            { name: 'I', value: 70, },
+            { name: 'J', value: 28, },
+            { name: 'K', value: 63, },
+        ];
+
+        //scale
+        const x = d3.scaleBand()
+            .domain(data.map((d) => d.name))
+            .rangeRound([0, width]);
+
+        const y = d3.scaleLinear()
+            .domain([0, d3.max(data, function (d) {
+                return d.value;
+            })])
+            .range([height, 0]);
+
+        //axis
+        const xAxis = d3.axisBottom(x)
+            .tickFormat(function(d) { return d; });
+
+        const yAxis = d3.axisLeft(y);
+
+
+        const chart = d3.select('.chart')
+            .attr('width', width + margin.left + margin.right)
+            .attr('height', height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+        const bar = chart.selectAll('g')
+            .data(data)
+            .enter().append('g')
+            .attr('transform', function(d) {
+                return `translate(${x(d.name)}, 0)`;
+            });
+
+        bar.append('rect')
+            .attr('class', 'bar')
+            .attr('y', function(d) { return y(d.value); })
+            .attr('width', x.bandwidth()-1)
+            .attr('height', function (d) {
+                return height - y(d.value);
+            });
+
+        bar.append('text')
+            .attr('x', x.bandwidth() / 2)
+            .attr('y', function (d) {
+                return y(d.value) + 3;
+            })
+            .attr('dy', '.75em')
+            .text(function(d) { return d.value; });
+
+        chart.append("g")
+            .attr("class", "x axis")
+            .attr("transform", `translate(0, ${height})`)
+            .call(xAxis);
+
+        chart.append("g")
+            .attr("class", "y axis")
+            .call(yAxis)
+            .append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy", "0.71em")
+            .text("value");
+    </script>
+</body>
+</html>
