@@ -8,6 +8,8 @@
 > 
 > [d3 tutorials](https://github.com/d3/d3/wiki/Tutorials)
 
+> [Let’s Make a Bar Chart](https://bost.ocks.org/mike/bar/), [Let’s Make a Bar Chart, II](https://bost.ocks.org/mike/bar/2/), [Let’s Make a Bar Chart, III](https://bost.ocks.org/mike/bar/3/)
+
 # svg和canvas
 
 html5新增`<canvas>`元素，可以使用js脚本来画图。常用用途，画图，组合图片，制作动画，甚至是实时视频处理或者渲染。此外，还可以使用WEBGL在网页上绘制硬件加速的3D图形。canvas基于像素。
