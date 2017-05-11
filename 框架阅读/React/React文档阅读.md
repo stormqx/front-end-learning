@@ -557,4 +557,264 @@ react有API来更新context,但是官方文档义正严辞的强调不要使用�
 ## Higher-Order Components
 HOC组件是一个函数，它接收一个组件然后返回一个新组件。
 
-(TODO: 这块目前没接触过，先留着。)
+```js
+const EnhancedComponent = higherOrderComponent(WrappedComponent);
+```
+
+HOC在第三方库中很常见。比如Redux中的`connect`和Relay中的`createContainer`。
+
+## Use HOCs For Cross-Cutting Concerns
+
+组件是React中代码复用的主要单元。但是，在有些模式下会发现传统组建并不是非常合适。
+
+例如，我们有一个`CommentList`组件监听了外部数据源来渲染一系列评论：
+
+```js
+class CommentList extends React.COmponent {
+  constructor() {
+    super();
+    this.handleChange = this.handleChange.bind(this);
+    this.state = {
+      // "DataSource" is some global data source
+      comments: DataSource.getComments()
+    };
+  }
+  
+  componentDidMount() {
+    // subscribe to changes
+    DataSource.addChangeListener(this.handleChange);
+  }
+  
+  componentWillUnmount() {
+    // clean up listener
+    DataSource.removeChangeListener(this.handleChange);
+  }
+  
+  handleChange() {
+    //update component state whenever the data source
+    this.setState({
+      comments: DataSource.getComments()
+    });
+  }
+  
+  render() {
+    return (
+      <div className = 'CommentList'>
+        {this.state.comments.map((comment) => (
+          <Comment comment = {comment} key = {comment.id}/>
+        ))}
+      </div>
+    )
+  }
+}
+```
+
+下面我们写一个组件来监听单个博客文章，其实是相似的模式:
+
+```js
+class BlogPost extends React.Component {
+  constructor(props) {
+    super(props);
+    this.handleChange = this.handleChange.bind(this);
+    this.state = {
+      blogPost: DataSource.getBlogPost(props.id)
+    };
+  }
+
+  componentDidMount() {
+    DataSource.addChangeListener(this.handleChange);
+  }
+
+  componentWillUnmount() {
+    DataSource.removeChangeListener(this.handleChange);
+  }
+
+  handleChange() {
+    this.setState({
+      blogPost: DataSource.getBlogPost(this.props.id)
+    });
+  }
+
+  render() {
+    return <TextBlock text={this.state.blogPost} />;
+  }
+}
+```
+
+上面的`CommentList`, `BlogPost`都是flux的常见实现方案。`CommentList`和`BlogPost`是不一样 -- 它们调用`DataSource`的不同方法，并且渲染不同的输出结果。但是它们大部分的实现是一样的：
+
+* 在Mount阶段，添加一个`DataSource`的监听器。
+* 在监听器中，当数据发生变化时，调用`setState`方法。
+* 在Unmount阶段，去除监听器。
+
+在一个大型应用中，这种相似的模式会一次次的出现。我们会很自然的想到抽象这层逻辑到一个地方，然后不同的组件共用这层逻辑。这就是HOC的思想所在。
+
+我们可以写一个函数来创建组件，比如监听`DataSource`的`CommentList`和`BlogPost`组件。该函数的一个参数是子组件，这个子组件将接受监听的数据作为props。我们称该函数为`withSubScription`:
+
+```js
+const CommentListWithSubscription = withSubscription(
+  CommentList,
+  (DataSource) => DataSource.getComments()
+);
+
+const BlogPostWithSubScription = withSubscription(
+  BlogPost,
+  (DataSource, props) => DataSource.getBlogPost(props.id)
+)
+```
+
+第一个参数是wrapped component. 第二个参数检索我们感兴趣的数据，给出了`DataSource`和当前的props.
+
+当`CommentListWithSubscription`和`BlogPostWithSubscription`渲染，`CommentList`和`BlogPost`组件将通过`data` props获取`DataSource`当前最新的数据。
+
+```js
+// this function takes a component
+function withSubscription(WrappedComponent, selectData) {
+  // ...and returns another component...
+  return class extends React.Component {
+    constructor(props) {
+      super(props);
+      this.handleChange = this.handleChange.bind(this);
+      this.state = {
+        data: selectData(DataSource, props),
+      };
+    }
+    
+    componentDidMount() {
+      // ... that takes care of the subscription
+      DataSource.addChangeListener(this.handleChange);
+    }
+    
+    componentWillUnmount() {
+      DataSource.removeChangeListener(this.handleChange);
+    }
+    
+    handleChange() {
+      this.setState({
+        data: selectData(DataSource, this.props)
+      });
+    }
+    
+    render() {
+      // ... and renders the wrapped component with the fresh data!
+      // Notice that we pass through any additional props
+      return <WrappedComponent data = { this.state.data } { ...this.props } />
+    }
+  }
+}
+```
+
+HOC没有修改input component,也没有使用继承来复制其行为。相反，HOC通过将其包装在容器组件中来组装成原始组件。一个HOC是没有副作用的纯函数。
+
+wrapped component接受容器的所有props, 以及一个新props --- `data`, 它用来渲染输出结果。HOC并不关心data被如何使用，wrapped component也不关心数据来自哪里。
+
+因为`withSubscription`是一个普通函数，所以我们可以随意的添加参数。和组件相同，`withSubscription`和wrapped component之间的契约完全基于props。这样做的好处是很容易更换不同的HOC, 只要保证它们提供相同的props给wrapped component. 这对于更换获取数据库函数来说非常有用。
+
+## Don`t Mutate the Original Component. Use Composition
+
+不要在HOC内部修改组件原型(或以其他方式改变)。
+
+```js
+function logProps(InputComponent) {
+  InputComponent.prototype.componentWillReceiveProps(nextProps) {
+    console.log('Current props: ', this.props);
+    console.log('Next props: ', nextProps);
+  }
+  // The fact that we're returning the original input is a hint that it has
+  // been mutated.
+  return InputComponent;
+}
+
+// EnhancedComponent will log whenever props are received
+const EnhancedComponent = logProps(InputComponent);
+```
+
+这种做法有一些坏处。第一个是`EnhancedComponent`和`InputComponent`的紧耦合。更致命的事，如果我们对`EnhancedComponent`应用其他的HOC也改变`componentWillReceiveProps`，这会掉址第一个HOC的功能被覆盖。
+
+所以应该使用组合代替突变(还是逃不开软件工程的核心概念啊)。可以通过把wrapped component封装进一个容器组件中:
+
+```js
+function logProps(WrappedComponent) {
+  return class extends React.Component {
+    componentWillReceiveProps(nextProps) {
+      console.log('Current props: ', this.props);
+      console.log('Next props: ', nextProps);
+    }
+    render() {
+      // Wraps the input component in a container, without mutating it. Good!
+      return <WrappedComponent {...this.props} />;
+    }
+  }
+}
+```
+
+## Convention: Pass Unrelated Props Through to the Wrapped Component
+
+HOC向组件添加功能。他们不应该大幅改变契约。
+
+```js
+render() {
+  // Filter out extra props that are specific to this HOC and shouldn't be
+  // passed through
+  const { extraProp, ...passThroughProps } = this.props;
+
+  // Inject props into the wrapped component. These are usually state values or
+  // instance methods.
+  const injectedProp = someStateOrInstanceMethod;
+
+  // Pass props to wrapped component
+  return (
+    <WrappedComponent
+      injectedProp={injectedProp}
+      {...passThroughProps}
+    />
+  );
+}
+```
+
+## Convention: Maximizing Composability
+
+HOC是不同的。
+
+```js
+const NavbarWithRouter = withRouter(Navbar);
+```
+
+Relay中的HOC:
+
+```js
+const CommentWithRelay = Relay.createContainer(Comment, config);
+```
+
+使用最广泛的HOC:
+
+```js
+// React Redux's `connect`
+const ConnectedComment = connect(commentSelector, commentActions)(Comment);
+```
+
+将上面的HOC分解后可能你会更容易理解：
+
+```js
+// connect is a function that returns another function
+const enhance = connect(commentListSelector, commentListActions);
+// The returned function is an HOC, which returns a component that is connected
+// to the Redux store
+const ConnectedComment = enhance(CommentList);
+```
+
+换句话说,`connect`是一个返回HOC组件的HOC函数！这种形式看起来似乎没有必要，但是它有用途。单参数的HOC比如`connect`函数, 这种输出类型和输入类型相同的函数很容易compose together（compose是函数式编程的一个概念，感觉比较难懂- - ）
+
+```js
+// Instead of doing this...
+const EnhancedComponent = connect(commentSelector)(withRouter(WrappedComponent))
+
+// ... you can use a function composition utility
+// compose(f, g, h) is the same as (...args) => f(g(h(...args)))
+const enhance = compose(
+  // These are both single-argument HOCs
+  connect(commentSelector),
+  withRouter
+)
+const EnhancedComponent = enhance(WrappedComponent)
+```
