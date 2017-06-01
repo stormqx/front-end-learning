@@ -46,7 +46,9 @@ $.ajax({
 JavaScript中将函数作为第一等公民来对待，可以将函数作为对象传递给方法作为实参进行调用，所以回调函数无处不在。
 
 * 单线程
+
 好处：不用像多线程编程处处在意状态的同步问题，没有死锁，没有线程上下文切换带来的性能开销。
+
 弱点：
 	1. 无法利用多核CPU.
 	2. 错误会引起整个应用程序退出，健壮性值得考验.
@@ -129,7 +131,52 @@ require()中文件扩展名：
 > 头部添加了:`(function (exports, require, module, __filename, __dirname) {\n`
 > 尾部添加了:`\n});`
 
+## 包与NPM
+包的结构目录：
 
+* package.json: 包描述文件。
+* bin: 用于存放可执行二进制文件的目录。
+* lib: 用于存放js代码的目录。
+* doc: 用于存放文档的目录。
+* test: 用于存放单元测试用例的代码。
+
+包描述文件(package.json):
+
+* name: 小写字母和数字
+* description
+* version
+* keywords: 数组，帮助别人搜索。
+* maintainers: 维护者列表。NPM通过该属性进行权限认证。[{"name":"qixin","email":"xx@qq.com","web":"cc.com"}]
+* contributors: 贡献者列表，格式同上。
+* bugs: 反馈bug的网页或者邮件地址。
+* licenses
+* repositories: 源代码位置。
+* dependencies: 依赖的包列表。非常终于熬，NPM通过这个属性自动加载依赖的包。
+* homepage
+* os: 支持的os列表。
+* cpu: 支持的cpu列表。
+* engine: 支持的js引擎列表。
+* builtin：是否是内建在底层系统的标准组件。
+* directories: 包目录说明。
+* implements: 实现规范列表。
+* scripts: 脚本说明对象。包含了install，uninstall，test等等，这其实是个`钩子命令`，在执行install的时候，preinstall指向的会被先触发。
+
+NPM多了4个字段：
+
+* author
+* bin: 这个字段设置了之后就可以作为命令行工具使用。
+* main: 模块引入方法`require()`在引入包时，会优先检查这个字段，并将其作为包中其余模块的入口。如果不存在这个字段，`require()`方法会查找包目录下的`index.js`、`index.node`、`index.json`文件作为默认入口。
+* devDependencies: 开发时需要的依赖。
+
+NPM实际上是CommonJS包规范的一种实践。
+
+## 前后端共用模块
+浏览器端的js需要经历从同一个服务器端分发到多个客户端执行，服务器端js则是相同的代码需要多次执行。**前者的瓶颈在于带宽，后者的瓶颈则在于CPU和内存等资源。**前者需要通过网络加载代码，后者从磁盘中加载，加载速度不在一个量级。
+
+### AMD规范
+AMD需要define方法来申明一个模块，并且在申明的时候得将依赖都写进去。
+
+CMD的话就更类似Conmonjs了，使用的时候再进行require就行了。
 
 
 
