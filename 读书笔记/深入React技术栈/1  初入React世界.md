@@ -50,6 +50,8 @@ componentWillUnmount方法中，会执行清除方法，如事件回收或清除
 ### componentWillReceiveProps
 `componentWillReceiveProps`函数可以看作是在 `prop` 传入之后， `render()` 渲染之前更新 `state` 的机会。 在这里使用`setState`只会渲染一次页面，react会将props和state引起的改变合并。
 
+  **注意：`componentWillReceiveProps`并不仅仅是当组件的props发生变化时触发。如果由于父组件的原因导致该组件re-render的话（比如父组件的state发生变化，触发了父组件的update lifecycle,会递归触发子组件的update lifcycle，这时即使子组件的props未发生变化,`compoenntWillReceiveProps`方法仍会被调用），同样会调用`compoenntWillReceiveProps`方法。所以如果想要处理变化时，应该自行对比`this.props`和`nextProps`的区别**。
+
 ### shouldComponentUpdate
 `shoudlComponentUpdate`函数在在初始化渲染的时候不会调用，在使用 `forceUpdate` 方法的时候也不会。`shouldComponentUpdate`函数中不可以使用`this.setState`方法,这会造成循环调用，直至耗光浏览器内存后崩溃。
 
