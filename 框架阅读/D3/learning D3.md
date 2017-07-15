@@ -203,7 +203,7 @@ d3.select('body')
 ```
 
 ### thinking with joins
-![Thinking with Joins](thinking with joins.png)
+![Thinking with Joins](./img/thinking-with-joins.png)
 
 数据和已存在节点joined产生*update selelction*。左侧未绑定的数据产生*enter selection*,代表未命中节点。右侧未绑定元素产生*exit selection*，代表将要被移除的元素。
 

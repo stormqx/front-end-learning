@@ -18,7 +18,7 @@
 var selection = d3.select('body');
 ```
 
-![d3 select](d3 select.png)
+![d3 select](./img/d3-select.png)
 
 在JavaScript console中，运行上述命令并且查看`_group`是`selection[0]`, node是`selection[0][0]`。
 
@@ -28,7 +28,7 @@ var selection = d3.select('body');
 d3.selectAll('h2');
 ```
 
-![d3 selectAll](d3 selectAll.png)
+![d3 selectAll](./img/d3-selectAll.png)
 
 `d3.select`和`d3.selectAll`产生的`selection`都只返回一个group。一个selection包含多个group的唯一途径是`selection.selectAll`。栗子可看 [select tr td](https://bost.ocks.org/mike/selection/)
 
@@ -42,7 +42,7 @@ d3.selectAll('tr').selectAll('td')
 
 大多数情况下，可以忽略掉selections是由group组成的。当使用`selection.attr`或者`selection.style`中定义的函数时，这些函数会被每个element调用；使用grouping的主要区别是这些函数的第二个参数`function(d, i)`是**within-group index**而不是within-selection index.
 
-# Non-Grouping Operations
+# Non-Grouping-operations
 只有`selectAll`有与grouping相关的特殊行为；`select`方法会保留已经存在的grouping。`select`方法不同的原因是在old selection中的每个element准确的对应了new selection中的一个element。因此，`select`会将数据从父元素传给子元素，然后`selectAll`不会（这是需要 data-join的原因）。
 
 `append`和`insert`方法包装在顶层select, 因此他们也需要保留grouping和传递数据。例如，给定一个包含四个sections的文档:
@@ -51,7 +51,7 @@ d3.selectAll('tr').selectAll('td')
 d3.selectAll('section');
 ```
 
-![non-grouping operation1](non-grouping operation1.png)
+![./img/non-grouping-operation1](./img/non-grouping-operation1.png)
 
 如果在每个section后面添加一个`p` element, new selection同样是拥有四个elements的单个group:
 
@@ -59,7 +59,7 @@ d3.selectAll('section');
 d3.selectAll('section').append('p');
 ```
 
-![non-grouping operation](non-grouping operation2.png)
+![./img/non-grouping-operation](./img/non-grouping-operation2.png)
 
 注意这个selection的`parentNode`仍然是ducument element，因为`selection.selectAll`没有被调用来重新组合selection.
 
@@ -72,7 +72,7 @@ Groups可以包含空值来表示missing elements。对于大多数操作来说�
 d3.selectAll('section').select('aside');
 ```
 
-![non-grouping operation3](non-grouping operation3.png)
+![./img/non-grouping-operation3](./img/non-grouping-operation3.png)
 
 与grouping一样，通常可以忽略掉null elements, 但请注意它们是用来保留**selection的结构**和**within-group index**.
 
@@ -91,7 +91,7 @@ d3.selectAll('section').select('aside');
 document.body.__data__ = 42;
 ```
 
-![non-grouping operation4](non-grouping operation4.png)
+![./img/non-grouping-operation4](./img/non-grouping-operation4.png)
 
 d3与上面代码效果相同的代码是选择body并且调用datum:
 
@@ -99,7 +99,7 @@ d3与上面代码效果相同的代码是选择body并且调用datum:
 d3.select('body').datum(42);
 ```
 
-![non-grouping operation5](non-grouping operation5.png)
+![./img/non-grouping-operation5](./img/non-grouping-operation5.png)
 
 如果我们现在向body `append`一个element, **子元素会自动继承来自父元素的data**:
 
@@ -107,7 +107,7 @@ d3.select('body').datum(42);
 d3.select('body').datum(42).append('h1');
 ```
 
-![non-grouping operation6](non-grouping operation6.png)
+![./img/non-grouping-operation6](./img/non-grouping-operation6.png)
 
 # What is Data?
 D3中的data可以是任何值组成的数组。例如:
@@ -133,11 +133,11 @@ var matrix = [
 
 我们用`selections`的表示方法来展示数据.下面是5个数值的普通数组：
 
-![non-grouping operation7](non-grouping operation7.png)
+![./img/non-grouping-operation7](./img/non-grouping-operation7.png)
 
 `selection.data`可以接受常量或者函数。然而，和其他的selection methods不同，**`selection.data`把数据定义在per-group上而不是per-element**: 数据针对于group表示成数组，或者返回这种数组的函数。所以，grouped selection有相对应的grouped data!
 
-![non-grouping operation8](non-grouping operation8.png)
+![./img/non-grouping-operation8](./img/non-grouping-operation8.png)
 
 > 因为在selection中有四个groups，这个data函数会被调用四次并且返回四个数组(每次生成一个数组)。返回的数组长度取决于data的长度。
 
@@ -150,19 +150,19 @@ join数据和元素重要的环节是必须知道哪个数据应该被分配给�
 var numbers = [4, 5, 18, 23, 42];
 ```
 
-![non-grouping operation9](non-grouping operation9.png)
+![./img/non-grouping-operation9](./img/non-grouping-operation9.png)
 
 ```js
 d3.selectAll('div').data(number);
 ```
 
-![10](non-grouping operation10.png)
+![10](./img/non-grouping-operation10.png)
 
 有些时候，你可以声明key function作为`selection.data`的第二个参数。D3会根据key function返回的key分配相应的数据。
 
 **每个group的joined操作时独立的。所以只需要保证group中key的唯一性即可。**
 
-![11](non-grouping operation11.png)
+![11](./img/non-grouping-operation11.png)
 
 #Enter, Update and exit
 * Update - There was a matching element for a given datum.
