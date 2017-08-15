@@ -3,6 +3,7 @@
 > * <<深入react技术栈>>
 > * redux的applyMiddleware，compose源码
 > * redux-thunk源码
+> * 项目中用到的简化异步请求操作的中间件源码
 
 # applyMiddleware
 
@@ -166,6 +167,30 @@ const getThenShow = (dispatch, getState) => {
 };
 ```
 
-#### redux-promise middleware
+#### 项目中用到的client middleware
 
-TODO
+```js
+export default function clientMiddleware() {
+  return ({ dispatch, getState }) => next => action => {
+    if(typeof action === 'function') {
+      // 这是为了使用redux-thunk的逻辑
+      return action(dispatch, getState);
+    }
+    
+    const { promise, types, ...rest } = action;
+    
+    if(!promise) next(action);
+    
+    const [ REQUEST, SUCCESS, FAILURE ] = types;
+    next(...rest, type: REQUEST);
+    
+    promise.then(
+    	(payload) => next(...rest, ...payload, type: SUCCESS),
+    	(error) => next(...rest, error, type: FAILURE)
+    ).catch((error) => {
+      console.log('middleware error', error);
+      next({...rest, error, type: FAILURE});
+    })
+  }
+}
+```
