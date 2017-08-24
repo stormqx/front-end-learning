@@ -40,4 +40,43 @@ window.open()
 
 `clearTimeout`和`clearInterval`.
 
-### 对话框
+## location
+
+`window.location === document.location`
+
+location用处：保存当前文档的信息，将URL解析为独立的片段。
+
+| 属性名 | 例子 | 
+| ----- | ----- |
+| hash |  #contents |
+| host | www.qx.com:80 |
+| hostname | www.qx.com |
+| href | http://www.qx.com |
+| pathname | /router |
+| port | 80 |
+| protocol | http: |
+| search | ?q=js |
+
+改变位置:
+
+```js
+location.assign("http://www.qx.com")
+
+window.location = "http://www.qx.com"
+
+location.href = "http://www.qx.com"  //常用
+```
+
+使用location修改url会在历史记录中生成一条新纪录。但是使用`replace`方法不会生成新纪录。用户不能回到前一个页面。
+
+## history对象
+
+```js
+// 后退一页
+history.go(-1);
+
+// 前端一页
+history.go(1);
+```
+
+
