@@ -61,7 +61,7 @@ replaceReducer()
 
 * `reducer`函数是redux的精髓，根据当前的状态树和action的信息执行返回下一阶段的状态🌲。
 * `preloadedState`，顾名思义，初始化的状态信息。
-* `enhancer`，通常使用`applyMiddleware`来天高redux的能力。
+* `enhancer`，通常使用`applyMiddleware`来提高redux的能力。
 
 
 接下来是一段判断输入参数的代码。可以不提供`preloadedState`参数而将第二项设置为`enhancer`函数.
@@ -104,13 +104,15 @@ function ensureCanMutableNextListeners() {
 
 `ensureCanMutableNextListeners `的作用我们后面再介绍。
 
-接下来是`getState`函数:
+接下来是`getState`函数, emmmmm, 太简单了，没什么好说的。
 
 ```js
 function getState() {
   return currentState;
 }
 ```
+
+接下来是`subscribe`函数，终于有点意思了呵.. 🀄️
 
 ```js
 /*
@@ -146,6 +148,8 @@ redux维护了两个listener数组，`currentListeners`和`nextListeners`。其�
 
 
 redux基本的实现只支持普通对象action，所以你想dispatch一个promise, observable等等，应该自己编写`middleware`来增强`dispatch`函数。
+
+哦哦😯， 下面是`dispatch`的源码。
 
 ```js
 ／*
@@ -302,6 +306,8 @@ redux将listeners分为`currentListeners`和`nextListeners`符合**单一职责�
 * `currentListeners`用来响应`dispatch`操作，进行`notify`操作。 在`notify`之前，使用`currentListeners = nextListeners`进行更新listeners操作。
 * `nextListeners`用来进行对listeners数组进行增加(`push`)／删除(`indexOf`后`splice`)操作。在每次对listeners数据进行操作前，调用`ensureCanMutableNextListeners`(调用`Array.slice()`进行浅拷贝)，保证不会影响`currentListeners`的数据。
 *  通过上面两个策略，可以减少浅拷贝的次数，而且**单一职责原则**让逻辑更加清晰。岂不是美滋滋。。。
+
+dispatch中使用`isDispatching`来保证一次只能有一个action被reducer, 有种单线程的感觉啊。这不会很慢嘛... 感觉到了immutable数据的重要性了。
 
 
 
