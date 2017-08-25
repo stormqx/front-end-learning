@@ -729,7 +729,7 @@ function logProps(InputComponent) {
 const EnhancedComponent = logProps(InputComponent);
 ```
 
-这种做法有一些坏处。第一个是`EnhancedComponent`和`InputComponent`的紧耦合。更致命的事，如果我们对`EnhancedComponent`应用其他的HOC也改变`componentWillReceiveProps`，这会掉址第一个HOC的功能被覆盖。
+这种做法有一些坏处。第一个是`EnhancedComponent`和`InputComponent`的紧耦合。更致命的事，如果我们对`EnhancedComponent`应用其他的HOC也改变`componentWillReceiveProps`，这会导致第一个HOC的功能被覆盖。
 
 所以应该使用组合代替突变(还是逃不开软件工程的核心概念啊)。可以通过把wrapped component封装进一个容器组件中:
 
