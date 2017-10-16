@@ -52,7 +52,7 @@ console.log('this is the last line of the script');
 
 ## error propagation
 
-`Rejections` 和 `error` 通过promise chains传播。当其中一个promise被reject, promise chains中接下来的promised都被reject.
+`Rejections` 和 `error` 通过promise chains传播。当其中一个promise被reject, 在一个`onRejected`处理函数被发现前，promise chains中接下来的promised都被reject.
 
 ```js
 Promise.reject(Error('bad news')).then(
